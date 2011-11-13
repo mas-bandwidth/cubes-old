@@ -62,6 +62,13 @@ Cubes.zip: $(files_to_zip)
 
 zip: Cubes.zip
 
+commit: clean
+	git add *
+	git commit -a -m "$(m)"
+
+push:
+	git push
+
 deps: Dependencies.d
 depend: Dependencies.d
 
