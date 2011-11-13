@@ -1,0 +1,593 @@
+/*****************************************************************************
+ * Networking Library by Glenn Fiedler <gaffer@gaffer.org>
+ * Copyright (c) Sony Computer Entertainment America 2008-2010
+ ****************************************************************************/
+
+#include "PreCompiled.h"
+#include "network/netSockets.h"
+#include "network/lanMesh.h"
+#include "network/lanNode.h"
+
+using namespace net;
+using namespace lan;
+
+SUITE( NetNodeMesh )
+{
+	TEST( test_node_join )
+	{
+		const int MaxPlayers = 2;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.01f;
+		const float SendRate = 0.01f;
+		const float TimeOut = 1.0f;
+
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+		
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( node.Start( "node", NodePort ) );
+		
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.JoinFailed() );
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_join_fail )
+	{
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const int MaxPlayers = 2;
+		const float DeltaTime = 0.01f;
+		const float SendRate = 0.001f;
+		const float TimeOut = 0.1f;
+
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( node.Start( "node", NodePort ) );
+		
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( node.JoinFailed() );
+	}
+
+	TEST( test_node_join_busy )
+	{
+		const int MaxPlayers = 1;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.001f;
+		const float SendRate = 0.001f;
+		const float TimeOut = 0.1f;
+		
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( node.Start( "node", NodePort ) );
+		
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.JoinFailed() );
+
+		Node busy( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( busy.Start( "busy", NodePort + 1 ) );
+
+		busy.Join( Address(127,0,0,1,MeshPort) );
+		while ( busy.IsJoining() )
+		{
+			node.Update( timeBase );
+			busy.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		CHECK( busy.JoinFailed() );
+		CHECK( node.IsConnected() );
+		CHECK( mesh.IsNodeConnected( 0 ) );
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_join_multi )
+	{
+		const int MaxPlayers = 4;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.01f;
+		const float SendRate = 0.01f;
+		const float TimeOut = 1.0f;
+
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+
+		Node * node[MaxPlayers];
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			node[i] = new Node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+			char name[64];
+			sprintf( name, "node%d", i );
+			CHECK( node[i]->Start( name, NodePort + i ) );
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+			node[i]->Join( Address(127,0,0,1,MeshPort) );		
+		
+		while ( true )
+		{
+			bool joining = false;
+			for ( int i = 0; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );	
+				if ( node[i]->IsJoining() )
+					joining = true;
+			}		
+			
+            if ( !joining )
+				break;
+			
+            mesh.Update( timeBase );
+
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			CHECK( !node[i]->IsJoining() );
+			CHECK( !node[i]->JoinFailed() );
+			delete node[i];
+		}
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_rejoin )
+	{
+		const int MaxPlayers = 2;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.001f;
+		const float SendRate = 0.001f;
+		const float TimeOut = 0.1f;
+		
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+		
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut * 3 );
+		CHECK( node.Start( "node", NodePort ) );
+
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		node.Stop();
+		CHECK( node.Start( "node", NodePort ) );
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+			
+		CHECK( !node.JoinFailed() );
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_timeout )
+	{
+		const int MaxPlayers = 2;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.001f;
+		const float SendRate = 0.001f;
+		const float TimeOut = 0.1f;
+		
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( node.Start( "node", NodePort ) );
+
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() || !mesh.IsNodeConnected( 0 ) )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.JoinFailed() );
+
+		int localNodeId = node.GetLocalNodeId();
+		int maxNodes = node.GetMaxNodes();
+
+		CHECK( localNodeId == 0 );
+		CHECK( maxNodes == MaxPlayers );
+		
+		CHECK( mesh.IsNodeConnected( localNodeId ) );
+		
+		while ( mesh.IsNodeConnected( localNodeId ) )
+		{
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !mesh.IsNodeConnected( localNodeId ) );
+
+		while ( node.IsConnected() )
+		{
+			node.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.IsConnected() );
+		CHECK( node.GetLocalNodeId() == -1 );
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_payload )
+	{
+		const int MaxPlayers = 2;
+		const int MeshPort = 30000;
+		const int ClientPort = 30001;
+		const int ServerPort = 30002;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.01f;
+		const float SendRate = 0.01f;
+		const float TimeOut = 1.0f;
+
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+
+		Node client( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( client.Start( "client", ClientPort ) );
+
+		Node server( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( server.Start( "server", ServerPort ) );
+		
+		mesh.Reserve( 0, Address(127,0,0,1,ServerPort) );
+
+		server.Join( Address(127,0,0,1,MeshPort) );
+		client.Join( Address(127,0,0,1,MeshPort) );
+		
+		bool serverReceivedPacketFromClient = false;
+		bool clientReceivedPacketFromServer = false;
+		
+		while ( !serverReceivedPacketFromClient || !clientReceivedPacketFromServer )
+		{
+			if ( client.IsConnected() )
+			{
+				uint8_t packet[] = "client to server";
+				client.SendPacket( 0, packet, sizeof(packet) );
+			}
+
+			if ( server.IsConnected() )
+			{
+				uint8_t packet[] = "server to client";
+				server.SendPacket( 1, packet, sizeof(packet) );
+			}
+			
+			while ( true )
+			{
+				int nodeId = -1;
+				uint8_t packet[256];
+				int bytes_read = client.ReceivePacket( nodeId, packet, sizeof(packet) );
+				if ( bytes_read == 0 )
+					break;
+				if ( nodeId == 0 && bytes_read == 17 && memcmp( (const char*) packet, "server to client", 17 ) == 0 )
+				{
+					if ( !clientReceivedPacketFromServer )
+						clientReceivedPacketFromServer = true;
+				}
+			}
+
+			while ( true )
+			{
+				int nodeId = -1;
+				uint8_t packet[256];
+				int bytes_read = server.ReceivePacket( nodeId, packet, sizeof(packet) );
+				if ( bytes_read == 0 )
+					break;
+				if ( nodeId == 1 && bytes_read == 17 && memcmp( (const char*) packet, "client to server", 17 ) == 0 )
+				{
+					if ( !serverReceivedPacketFromClient )
+						serverReceivedPacketFromClient = true;
+				}
+			}
+			
+			client.Update( timeBase );
+			server.Update( timeBase );
+
+			mesh.Update( timeBase );
+
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		CHECK( client.IsConnected() );
+		CHECK( server.IsConnected() );
+
+		mesh.Stop();
+	}
+
+	TEST( test_node_mesh_restart )
+	{
+		const int MaxPlayers = 2;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.001f;
+		const float SendRate = 0.001f;
+		const float TimeOut = 0.1f;
+		
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+
+		Node node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( node.Start( "node", NodePort ) );
+
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.JoinFailed() );
+		CHECK( node.GetLocalNodeId() == 0 );
+
+		mesh.Stop();
+
+		while ( node.IsConnected() )
+		{
+			node.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		CHECK( mesh.Start( MeshPort ) );
+			
+		node.Join( Address(127,0,0,1,MeshPort) );
+		while ( node.IsJoining() )
+		{
+			node.Update( timeBase );
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		CHECK( !node.JoinFailed() );
+		CHECK( node.GetLocalNodeId() == 0 );
+	}
+
+	TEST( test_node_mesh_multiple_nodes )
+	{
+		const int MaxPlayers = 4;
+		const int MeshPort = 30000;
+		const int NodePort = 30001;
+		const int ProtocolId = 0x12345678;
+		const float DeltaTime = 0.01f;
+		const float SendRate = 0.01f;
+		const float TimeOut = 1.0f;
+		
+        net::TimeBase timeBase;
+        timeBase.deltaTime = SecondsToNetworkTime( DeltaTime );
+
+		Mesh mesh( ProtocolId, MaxPlayers, SendRate, TimeOut );
+		CHECK( mesh.Start( MeshPort ) );
+		
+		Node * node[MaxPlayers];
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			node[i] = new Node( ProtocolId, MaxPlayers, SendRate, TimeOut );
+			char name[64];
+			sprintf( name, "node%d", i );
+			CHECK( node[i]->Start( name, NodePort + i ) );
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+			node[i]->Join( Address(127,0,0,1,MeshPort) );		
+		
+		while ( true )
+		{
+			bool joining = false;
+			for ( int i = 0; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );
+				if ( node[i]->IsJoining() )
+					joining = true;
+			}		
+			if ( !joining )
+				break;
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			CHECK( !node[i]->IsJoining() );
+			CHECK( !node[i]->JoinFailed() );
+		}
+
+		// wait for all nodes to get address info for other nodes
+
+		while ( true )
+		{
+			bool allConnected = true;
+			for ( int i = 0; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );	
+				for ( int j = 0; j < MaxPlayers; ++j )
+				if ( !node[i]->IsNodeConnected( j ) )
+					allConnected = false;
+			}		
+			if ( allConnected )
+				break;
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		// verify each node has correct addresses for all nodes
+		
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			for ( int j = 0; j < MaxPlayers; ++j )
+			{
+				CHECK( mesh.IsNodeConnected(j) );
+				CHECK( node[i]->IsNodeConnected(j) );
+				CHECK( mesh.GetNodeAddress(j) == node[i]->GetNodeAddress(j) );
+			}
+		}
+		
+		// disconnect first node, verify all other node see node disconnect
+
+		node[0]->Stop();
+		
+		while ( true )
+		{
+			bool othersSeeFirstNodeDisconnected = true;
+			for ( int i = 1; i < MaxPlayers; ++i )
+			{
+				if ( node[i]->IsNodeConnected(0) )
+					othersSeeFirstNodeDisconnected = false;
+			}
+			
+			bool allOthersConnected = true;
+			for ( int i = 1; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );	
+				for ( int j = 1; j < MaxPlayers; ++j )
+					if ( !node[i]->IsNodeConnected( j ) )
+						allOthersConnected = false;
+			}		
+			
+			if ( othersSeeFirstNodeDisconnected && allOthersConnected )
+				break;
+				
+			mesh.Update( timeBase );
+
+            timeBase.time += timeBase.deltaTime;
+		}
+		
+		for ( int i = 1; i < MaxPlayers; ++i )
+			CHECK( !node[i]->IsNodeConnected(0) );
+		
+		for ( int i = 1; i < MaxPlayers; ++i )
+		{
+			for ( int j = 1; j < MaxPlayers; ++j )
+				CHECK( node[i]->IsNodeConnected( j ) );
+		}
+		
+		// reconnect node, verify all nodes are connected again
+
+		CHECK( node[0]->Start( "node0", NodePort ) );
+		node[0]->Join( Address(127,0,0,1,MeshPort) );		
+		
+		while ( true )
+		{
+			bool joining = false;
+			for ( int i = 0; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );	
+				if ( node[i]->IsJoining() )
+					joining = true;
+			}		
+			if ( !joining )
+				break;
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			CHECK( !node[i]->IsJoining() );
+			CHECK( !node[i]->JoinFailed() );
+		}
+
+		while ( true )
+		{
+			bool allConnected = true;
+			for ( int i = 0; i < MaxPlayers; ++i )
+			{
+				node[i]->Update( timeBase );	
+				for ( int j = 0; j < MaxPlayers; ++j )
+				if ( !node[i]->IsNodeConnected( j ) )
+					allConnected = false;
+			}		
+			if ( allConnected )
+				break;
+			mesh.Update( timeBase );
+            timeBase.time += timeBase.deltaTime;
+		}
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+		{
+			for ( int j = 0; j < MaxPlayers; ++j )
+			{
+				CHECK( mesh.IsNodeConnected(j) );
+				CHECK( node[i]->IsNodeConnected(j) );
+				CHECK( mesh.GetNodeAddress(j) == node[i]->GetNodeAddress(j) );
+			}
+		}
+
+		// cleanup
+
+		for ( int i = 0; i < MaxPlayers; ++i )
+			delete node[i];
+
+		mesh.Stop();
+	}
+}

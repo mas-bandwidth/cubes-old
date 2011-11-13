@@ -1,0 +1,71 @@
+DONE:
+- link with generated cpp files output
+- convert minimal demo to use new network layer
+- get basic singleplayer demo working
+- get anti-aliasing working
+- convert to sublime edit
+- convert into "shared", "client", "server" directories for code (a good way to split...)
+- don't include "client" headers/libs into shared (!!)
+- add "lib" target to network makefile
+- link to network lib
+- make sure network lib gets built
+
+TODO:
+- add to git
+- get tests working again (test network, then test engine...)
+- find a way to record input and play back
+- find a way to output video at 60HZ and process it into a video
+
+visual things to show:
+- splitscreen demo: synchronize left -> right with latency
+- show single cube, tumbling motion (explore interpolation vs. state pushing here?)
+- pushing objects at a distance (blow)
+- groups of objects interacting (katamari)
+- show multiple cubes, explain how engine works, activation etc.
+- side by side demo, with latency
+- just sync the inputs. show it drift out of sync ---> discussion about determinism
+- show updates at 10pps (strobing, point sampling etc.)
+- show interpolation/extrapolation. adds latency. linearization is a problem etc.
+- show prioritized updates (slow down into slow motion and flash as each cube is updated)
+- demonstrate quantization jitter (both for position + 0.5f, and for quaternion using shit technique 8.8.8.8) ==> quantize on both sides
+
+cool things to share:
+- how objects are identified over the network (object id)
+- how serialization function, variable encoding for data
+- smallest three quaternion compression
+- priority bubbling up
+- unit vector compression technique (need to recover source code!)
+- want to explore delta encoding, eg. encoding relative to previous position
+  (this is the *ultimate* encoding for reducing position/orientation bw...)
+- bandwidth stats from sony to justify 64kbit/sec
+- explain how packet header overhead works, how much payload etc.
+- fake a lag switch to induce packet loss and show how it behaves (show recovering in pieces, lerps etc.)
+- want to explain that when i push an object if it is at rest, i force it to be at rest. don't want to "disturb" other objects
+  or have a desynced at rest state between machines. hand coded at rest update.
+- latency cost for interpolation
+- problems with packet loss => extrapolation
+- study the extrapolation code from jon watte (EPIC)
+
+key points:
+- i want to record video for the talk instead of running a live demo = less stress, better presentation post-GDC
+- do not talk about something if there is not a cool video or visual diagram to explain it
+- the entire talk must be visual
+- source code examples can come from sublime edit 2
+
+side points:
+- interpolation works great for motion that has high jerk. eg. player motion,
+  because you cannot really predict something when it depends entirely on user input (FPS)
+  valve games use interpolation exclusively. cost is added 100ms latency
+- if you have a racing game, extrapolating linearly (dead reckoning) works well, because car
+  motion is predictable, you cannot stop on a dime
+- for a tumbling rotating ridid body, motion is a function of input, but changes slowly, like
+  a car, extrap using physics sim is best bet. linear extrap or ballistic is poor.
+
+ideas:
+- get better visual quality by writing a pixel shader (per-pixel lighting will look less flat)
+- fix the at rest jitter by requiring a certain force threshold to wake an object from rest (if white)
+- integrate FMOD and get some sounds going, increase the pitch of the sounds the longer the cube grows
+- try to approxmimate ambient self-occulision while in the katamari to get better lighting
+- highlight recently acquired red cubes with some "blip" highlight color
+- experiment with different colors. i particularly like the contrast of sky blue, white and yellow.
+

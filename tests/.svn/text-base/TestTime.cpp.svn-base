@@ -1,0 +1,38 @@
+/*****************************************************************************
+ * Networking Library by Glenn Fiedler <gaffer@gaffer.org>
+ * Copyright (c) Sony Computer Entertainment America 2008-2010
+ ****************************************************************************/
+
+#include "PreCompiled.h"
+#include "network/netTime.h"
+
+using namespace net;
+
+SUITE( NetUtil )
+{
+    TEST( test_time_base )
+	{
+        net::TimeBase timeBase;
+
+        CHECK( timeBase.time == 0 );
+        CHECK( timeBase.deltaTime == 0 );
+
+        timeBase.Advance( 1.0 );
+
+        const float t = (float) NetworkTimeToSeconds( timeBase.time );
+        const float dt = (float) NetworkTimeToSeconds( timeBase.time );
+
+        CHECK_CLOSE( 1.0f, t, 0.0001 );
+        CHECK_CLOSE( 1.0f, dt, 0.0001 );
+
+        Time a = timeBase.time;
+        Time b = a + SecondsToNetworkTime( 10.0 );
+        CHECK_CLOSE( 10.0f, TimeDifferenceInSeconds( a, b ), 0.0001 ); 
+        CHECK_CLOSE( 10.0f, TimeDifferenceInSeconds( b, a ), 0.0001 ); 
+
+        Time x = MaxTime - SecondsToNetworkTime( 5.0 );
+        Time y = SecondsToNetworkTime( 5.0 );
+        CHECK_CLOSE( 10.0f, TimeDifferenceInSeconds( x, y ), 0.0001 ); 
+        CHECK_CLOSE( 10.0f, TimeDifferenceInSeconds( y, x ), 0.0001 ); 
+	}
+}

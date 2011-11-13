@@ -1,0 +1,544 @@
+/*****************************************************************************
+ * Networking Library by Glenn Fiedler <gaffer@gaffer.org>
+ * Copyright (c) Sony Computer Entertainment America 2008-2010
+ ****************************************************************************/
+
+#include "PreCompiled.h"
+#include "network/netStream.h"
+#include "network/netState.h"
+#include "network/netAtom.h"
+
+using namespace net;
+
+static const int MaxStateHeaders = 256;
+
+SUITE( NetState )
+{
+	enum StateTypes
+	{
+		STATE_A,
+		STATE_B,
+		STATE_NumTypes
+	};
+
+	struct State : public net::State
+	{	 
+	public:
+		State( int _type ) : net::State(_type), id(0) {}
+		void SetId( uint32_t _id ) { id = _id; }
+		uint32_t GetId() const { return id; }
+		uint32_t id;
+	};
+
+	class StateA : public State
+	{
+	public:
+		
+		int i,j,k;
+		bool optional;
+		int optional_a;
+		int optional_b;
+		int optional_c;
+
+		StateA() : State( STATE_A )
+		{
+			i = j = k = 0;
+			optional = false;
+			optional_a = 0;
+			optional_b = 0;
+			optional_c = 0;
+		}
+			
+		bool Serialize( Stream & stream, void * context )
+		{
+			NET_ASSERT( context != NULL );
+			serialize_uncompressed_int( stream, id );
+			serialize_uncompressed_int( stream, i );
+			serialize_uncompressed_int( stream, j );
+			serialize_uncompressed_int( stream, k );
+			serialize_bool( stream, optional );
+			if ( optional )
+			{
+				serialize_uncompressed_int( stream, optional_a );
+				serialize_uncompressed_int( stream, optional_b );
+				serialize_uncompressed_int( stream, optional_c );
+			}
+			return true;
+		}
+		
+		bool operator == ( const StateA & other ) const
+		{
+			return i == other.i && j == other.j && k == other.k && optional == other.optional && 
+				( !optional || ( optional && ( optional_a == other.optional_a && optional_b == other.optional_b && optional_c == other.optional_c ) ) );
+		}
+		
+		bool operator != ( const StateA & other ) const
+		{
+			return ! ( *this == other );
+		}
+
+        void Trace( const char channel[] )
+        {
+        }
+
+		void Print()
+		{
+			printf( "state A: i=%d, j=%d, k=%d\n", i, j, k );
+		}
+	};
+	
+	class StateB : public State
+	{
+	public:
+
+		bool i,j,k;
+		float x,y,z;
+		
+		StateB() : State( STATE_B )
+		{
+			id = 0;
+			i = j = k = false;
+			x = y = z = 0.0f;
+		}
+		
+		bool Serialize( Stream & stream, void * context )
+		{
+			NET_ASSERT( context != NULL );
+			serialize_uncompressed_int( stream, id );
+			serialize_bool( stream, i );
+			serialize_bool( stream, j );
+			serialize_bool( stream, k );
+			serialize_uncompressed_float( stream, x );
+			serialize_uncompressed_float( stream, y );
+			serialize_uncompressed_float( stream, z );
+			return true;
+		}
+
+		bool operator == ( const StateB & other ) const
+		{
+			return i == other.i && j == other.j && k == other.k &&
+				   x == other.x && y == other.y && z == other.z;
+		}
+
+		bool operator != ( const StateB & other ) const
+		{
+			return ! ( *this == other );
+		}
+		
+		void Trace( const char channel[] )
+		{
+		}
+
+        void Print()
+        {
+			printf( "state B: i=%d, j=%d, k=%d, x=%1f, y=%1f, z=%1f\n", i, j, k, x, y, z );
+        }
+	};
+	
+	class TestStateHeader : public net::StateHeader
+	{
+	public:
+		
+		uint32_t frame;
+		
+		TestStateHeader()
+		{
+			frame = 0;
+		}
+		
+		bool Serialize( net::Stream & stream )
+		{
+			serialize_uncompressed_int( stream, frame );
+			return true;
+		}
+	};
+	
+	class TestStateFactory : public StateFactory
+	{
+	public:
+		
+		TestStateFactory() : StateFactory( AtomFactoryConfig() )
+		{
+			m_headerPool = new PoolAllocator( MaxStateHeaders, sizeof( TestStateHeader ) );
+		}
+		
+		~TestStateFactory()
+		{
+			delete m_headerPool;
+			m_headerPool = NULL;
+		}
+		
+		int GetNumTypes() const
+		{
+			return STATE_NumTypes;
+		}
+		
+		const char * GetTypeName( int type ) const
+		{
+			if ( type == STATE_A )
+				return "a";
+			else if ( type == STATE_B )
+				return "b";
+			else
+				return "???";
+		}
+
+        void Construct( int type, void * block )
+        {
+			if ( type == STATE_A )
+			{
+				NET_ASSERT( sizeof( StateA ) <= (size_t) GetConfig().maxAtomSize );
+				new(block) StateA();
+			}
+			else if ( type == STATE_B )
+			{
+				NET_ASSERT( sizeof( StateB ) <= (size_t) GetConfig().maxAtomSize );
+				new(block) StateB();
+			}
+        }
+
+		net::StateHeader * CreateStateHeader()
+		{
+			uint8_t * block = (uint8_t*) m_headerPool->Allocate();
+			NET_ASSERT( block );
+			new(block) TestStateHeader();
+			return (net::StateHeader*) block;
+		}
+
+		void DestroyStateHeader( net::StateHeader * header )
+		{
+			NET_ASSERT( header );
+			header->~StateHeader();
+			m_headerPool->Free( header );
+		}
+		
+	private:
+		
+		PoolAllocator * m_headerPool;
+	};
+
+	TEST( test_state_initial_conditions )
+	{
+		StateConfig config;
+		TestStateFactory factory;
+		StateQueue stateQueue( factory, config );
+		CHECK( stateQueue.GetNumSendObjects() == 0 );
+	}
+	
+	TEST( test_state_send )
+	{
+		const int PacketSize = 1024;
+		const int JournalSize = 1024;
+		const int MaxObjectsPerPacket = 32;
+
+		StateConfig config;
+		config.maxObjectsPerPacket = 32;
+
+		TestStateFactory factory;
+		StateQueue stateQueue( factory, config );
+		
+		net::State * stateObjects[MaxObjectsPerPacket];
+		int stateTypes[MaxObjectsPerPacket];
+		
+		for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+		{
+			StateA * a = static_cast<StateA*>( factory.Create( STATE_A ) );
+			NET_ASSERT( a );
+			a->SetId( i );
+			stateObjects[i] = a;
+			stateTypes[i] = STATE_A;
+			CHECK( stateObjects[i] );
+		}
+
+		CHECK( stateQueue.GetNumSendObjects() == 0 );
+
+		TestStateHeader * stateHeader = static_cast<TestStateHeader*>( factory.CreateStateHeader() );
+		NET_ASSERT( stateHeader );
+
+		stateQueue.Send( stateHeader, stateObjects, config.maxObjectsPerPacket );
+
+		CHECK( stateQueue.GetNumSendObjects() == config.maxObjectsPerPacket );
+
+		{
+			uint8_t data[PacketSize];
+			uint8_t journal[JournalSize];
+			Stream stream( Stream::Write, data, PacketSize, journal, JournalSize );
+			bool result = stateQueue.SerializePacket( stream, 0 );
+			CHECK( result );
+			if ( result )
+				stateQueue.CommitPacket();
+			else
+				stateQueue.DiscardPacket();
+
+			CHECK( stateQueue.GetNumSendObjects() == 0 );
+		}
+	}
+	
+	TEST( test_state_send_and_receive )
+	{
+		const int PacketSize = 1024;
+		const int JournalSize = 1024;
+		const int MaxObjectsPerPacket = 32;
+
+		StateConfig config;
+		TestStateFactory factory;
+		StateQueue sendStateQueue( factory, config );
+		StateQueue receiveStateQueue( factory, config );
+		
+		net::State * sendStateObjects[MaxObjectsPerPacket];
+
+		for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+		{
+			if ( rand() % 2 )
+			{
+				StateA * a = static_cast<StateA*>( factory.Create( STATE_A ) );
+				NET_ASSERT( a );
+				a->SetId( i );
+				a->i = rand() % 1000;
+				a->j = rand() % 1000;
+				a->k = rand() % 1000;
+				a->optional = ( rand() % 2 ) ? true : false;
+				a->optional_a = rand() % 1000;
+				a->optional_b = rand() % 1000;
+				a->optional_c = rand() % 1000;
+				sendStateObjects[i] = a;
+			}
+			else
+			{
+				StateB * b = static_cast<StateB*>( factory.Create( STATE_B ) );
+				NET_ASSERT( b );
+				b->SetId( i );
+				b->i = ( rand() % 2 ) ? true : false;
+				b->j = ( rand() % 2 ) ? true : false;
+				b->k = ( rand() % 2 ) ? true : false;
+				b->x = float( rand() % 1000 );
+				b->y = float( rand() % 1000 );
+				b->z = float( rand() % 1000 );
+				sendStateObjects[i] = b;
+			}
+		}
+
+		CHECK( sendStateQueue.GetNumSendObjects() == 0 );
+
+		// note: clone objects to send, so we can compare sent objects to those received (objects are deleted on send)
+		{
+			net::State * clonedObjects[MaxObjectsPerPacket];
+			for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+			{
+				clonedObjects[i] = (State*) factory.Clone( sendStateObjects[i] );
+				CHECK( clonedObjects[i] );
+			}
+
+			TestStateHeader * stateHeader = static_cast<TestStateHeader*>( factory.CreateStateHeader() );
+			NET_ASSERT( stateHeader );
+			stateHeader->frame = 100;
+
+			sendStateQueue.Send( stateHeader, clonedObjects, config.maxObjectsPerPacket );
+		}
+
+		CHECK( sendStateQueue.GetNumSendObjects() == config.maxObjectsPerPacket );
+
+		uint8_t data[PacketSize];
+		uint8_t journal[JournalSize];
+		{
+			Stream write_stream( Stream::Write, data, PacketSize, journal, JournalSize );
+			bool result = sendStateQueue.SerializePacket( write_stream, 0 );
+			CHECK( result );
+			if ( result )
+				sendStateQueue.CommitPacket();
+			else
+				sendStateQueue.DiscardPacket();
+		}
+		{
+			Stream read_stream( Stream::Read, data, PacketSize, journal, JournalSize );
+			bool result = receiveStateQueue.SerializePacket( read_stream, 0 );
+			CHECK( result );
+		}
+		
+		CHECK( receiveStateQueue.IsReadyToReceive() );
+
+		net::State * receiveStateObjects[MaxObjectsPerPacket];
+		
+		int receiveNumObjects = 0;
+		net::StateHeader * header = NULL;
+		receiveStateQueue.Receive( header, receiveStateObjects, receiveNumObjects );
+		
+		CHECK( header != NULL );
+		CHECK( ((TestStateHeader*)header)->frame == 100 );
+		CHECK( receiveNumObjects == config.maxObjectsPerPacket );
+
+		factory.DestroyStateHeader( header );
+
+		for ( int i = 0; i < receiveNumObjects; ++i )
+		{
+			CHECK( receiveStateObjects[i] );
+			CHECK( receiveStateObjects[i]->GetType() == sendStateObjects[i]->GetType() );
+			if ( receiveStateObjects[i]->GetType() == STATE_A )
+			{
+				StateA * a_sent = static_cast<StateA*>( sendStateObjects[i] );
+				StateA * a_recv = static_cast<StateA*>( receiveStateObjects[i] );
+				CHECK( *a_sent == *a_recv );
+			}
+			else
+			{
+				StateB * b_sent = static_cast<StateB*>( sendStateObjects[i] );
+				StateB * b_recv = static_cast<StateB*>( receiveStateObjects[i] );
+				CHECK( *b_sent == *b_recv );
+			}
+		}
+		
+		for ( int i = 0; i < receiveNumObjects; ++i )
+			factory.Destroy( receiveStateObjects[i] );
+
+		for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+			factory.Destroy( sendStateObjects[i] );
+	}
+
+	TEST( test_state_send_and_receive_limited_bits )
+	{
+		const int PacketSize = 100;
+		const int JournalSize = 100;
+		const int MaxObjectsPerPacket = 32;
+
+		StateConfig config;
+		config.maxObjectsPerPacket = MaxObjectsPerPacket;
+
+		TestStateFactory factory;
+		StateQueue sendStateQueue( factory, config );
+		StateQueue receiveStateQueue( factory, config );
+		
+		net::State * sendStateObjects[MaxObjectsPerPacket];
+
+		for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+		{
+			if ( rand() % 2 )
+			{
+				StateA * a = static_cast<StateA*>( factory.Create( STATE_A ) );
+				NET_ASSERT( a );
+				a->SetId( i );
+				a->i = rand() % 1000;
+				a->j = rand() % 1000;
+				a->k = rand() % 1000;
+				a->optional = ( rand() % 2 ) ? true : false;
+				a->optional_a = rand() % 1000;
+				a->optional_b = rand() % 1000;
+				a->optional_c = rand() % 1000;
+				sendStateObjects[i] = a;
+			}
+			else
+			{
+				StateB * b = static_cast<StateB*>( factory.Create( STATE_B ) );
+				NET_ASSERT( b );
+				b->SetId( i );
+				b->i = ( rand() % 2 ) ? true : false;
+				b->j = ( rand() % 2 ) ? true : false;
+				b->k = ( rand() % 2 ) ? true : false;
+				b->x = float( rand() % 1000 );
+				b->y = float( rand() % 1000 );
+				b->z = float( rand() % 1000 );
+				sendStateObjects[i] = b;
+			}
+		}
+
+		CHECK( sendStateQueue.GetNumSendObjects() == 0 );
+
+		// note: clone objects to send, so we can compare sent objects to those received (objects are deleted on send)
+		{
+			net::State * clonedObjects[MaxObjectsPerPacket];
+			for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+			{
+				clonedObjects[i] = (State*) factory.Clone( sendStateObjects[i] );
+				CHECK( clonedObjects[i] );
+			}
+			
+			TestStateHeader * stateHeader = static_cast<TestStateHeader*>( factory.CreateStateHeader() );
+			NET_ASSERT( stateHeader );
+			stateHeader->frame = 100;
+
+			sendStateQueue.Send( stateHeader, clonedObjects, config.maxObjectsPerPacket );
+		}
+
+		CHECK( sendStateQueue.GetNumSendObjects() == config.maxObjectsPerPacket );
+
+		uint8_t data[PacketSize];
+		uint8_t journal[JournalSize];
+		{
+			Stream write_stream( Stream::Write, data, PacketSize, journal, JournalSize );
+			bool result = sendStateQueue.SerializePacket( write_stream, 0 );
+			CHECK( result );
+		}
+		{
+			Stream read_stream( Stream::Read, data, PacketSize, journal, JournalSize );
+			bool result = receiveStateQueue.SerializePacket( read_stream, 0 );
+			CHECK( result );
+		}
+		
+		CHECK( receiveStateQueue.IsReadyToReceive() );
+
+		net::State * receiveStateObjects[MaxObjectsPerPacket];	
+		int receiveNumObjects = 0;
+		net::StateHeader * header = NULL;
+		receiveStateQueue.Receive( header, receiveStateObjects, receiveNumObjects );
+		
+		CHECK( header );
+		CHECK( ((TestStateHeader*)header)->frame == 100 );
+		CHECK( receiveNumObjects <= config.maxObjectsPerPacket );
+
+		factory.DestroyStateHeader( header );
+
+		bool * sentObjects = sendStateQueue.GetSent();
+		CHECK( sentObjects );
+		if ( !sentObjects )
+		{
+			printf( "error: NULL sent objects\n" );
+			exit(1);
+		}
+
+		NET_ASSERT( receiveNumObjects < MaxObjectsPerPacket );
+			
+		for ( int i = 0; i < receiveNumObjects; ++i )
+		{
+			CHECK( receiveStateObjects[i] );
+			net::State * sentState = NULL;
+			for ( int j = 0; j < MaxObjectsPerPacket; ++j )
+			{
+				if ( ((State*)receiveStateObjects[i])->GetId() == ((State*)sendStateObjects[j])->GetId() )
+				{
+					sentState = sendStateObjects[j];
+					CHECK( sentState->GetType() == receiveStateObjects[i]->GetType() );
+					break;
+				}
+			}
+			CHECK( sentState );
+			CHECK( receiveStateObjects[i]->GetType() == sentState->GetType() );
+			if ( receiveStateObjects[i]->GetType() == STATE_A )
+			{
+				StateA * a_sent = static_cast<StateA*>( sentState );
+				StateA * a_recv = static_cast<StateA*>( receiveStateObjects[i] );
+				CHECK( *a_sent == *a_recv );
+			}
+			else
+			{
+				StateB * b_sent = static_cast<StateB*>( sentState );
+				StateB * b_recv = static_cast<StateB*>( receiveStateObjects[i] );
+				CHECK( *b_sent == *b_recv );
+			}
+		}
+		
+		sendStateQueue.CommitPacket();
+		
+		CHECK( sendStateQueue.GetNumSendObjects() == 0 );
+
+		for ( int i = 0; i < receiveNumObjects; ++i )
+			factory.Destroy( receiveStateObjects[i] );
+
+		for ( int i = 0; i < MaxObjectsPerPacket; ++i )
+			factory.Destroy( sendStateObjects[i] );
+	}
+	
+	// NETHACK: todo - need to add a test that verifies codepath of user *NOT* receiving state
+	// works properly, eg. pulling state and serialize read the packet, but user does not call Receive
+	
+	// NETHACK: todo - need to add a test that verifies on reset that all the correct data is cleaned
+	// eg. that the state factory now has zero atoms allocated and zero state headers
+}
