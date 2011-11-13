@@ -9,12 +9,16 @@ DONE:
 - add "lib" target to network makefile
 - link to network lib
 - make sure network lib gets built
+- add to git
 
 TODO:
-- add to git
-- get tests working again (test network, then test engine...)
+- get tests working again (ideally, link network tests in with engine tests and run in one go...)
+- generalize keyboard input processing so I have access to all keys
 - find a way to record input and play back
 - find a way to output video at 60HZ and process it into a video
+- find a way to render high quality text
+- ideally, find a way to combine OpenGL and Cocoa rendering and compositing
+  (will make it easier to visualize and show debug functionality!)
 
 visual things to show:
 - splitscreen demo: synchronize left -> right with latency
@@ -68,4 +72,6 @@ ideas:
 - try to approxmimate ambient self-occulision while in the katamari to get better lighting
 - highlight recently acquired red cubes with some "blip" highlight color
 - experiment with different colors. i particularly like the contrast of sky blue, white and yellow.
-
+- the only thing stopping me from using other shapes is my silhouette code which is specific
+  to cubes. if the silhoutte code was rewritten using a vertex shader (extrude degenerate)
+  then I could easy support other shapes like cylinders, spheres, trimesh etc...

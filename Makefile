@@ -20,11 +20,11 @@ server_objs  := $(patsubst server/%.cpp,server/%.o,$(wildcard server/*.cpp))
 shared_objs  := $(patsubst shared/%.cpp,shared/%.o,$(wildcard shared/*.cpp))
 source_files := $(wildcard *.cpp) $(wildcard network/*.cpp) $(wildcard client/*.cpp) $(wildcard server/*.cpp) $(wildcard shared/*.cpp) $(wildcard tests/*.cpp)
 
-PreCompiled.d : PreCompiled.h
-	@makedepend -f- PreCompiled.h $(flags) > PreCompiled.d 2>/dev/null
-
 network/output/libnetwork.a:
 	make -C network lib
+
+PreCompiled.d : PreCompiled.h network/output/libnetwork.a
+	@makedepend -f- PreCompiled.h $(flags) > PreCompiled.d 2>/dev/null
 
 $(pch): PreCompiled.h PreCompiled.d $(makefile) network/output/libnetwork.a
 	$(compiler) PreCompiled.h $(flags)
@@ -46,8 +46,9 @@ demo : Demo
 loc: 
 	wc -l *.cpp *.h network/*.h network/*.cpp tests/*.h tests/*.cpp client/*.h client/*.cpp server/*.h server/*.cpp shared/*.h shared/*.cpp 
 
-test: UnitTest
-	./UnitTest
+test: #UnitTest
+	make -C network test
+#	./UnitTest
 
 clean:
 	make -C network clean
