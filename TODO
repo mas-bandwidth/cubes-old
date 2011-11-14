@@ -10,15 +10,27 @@ DONE:
 - link to network lib
 - make sure network lib gets built
 - add to git
+- capture uncompressed TGA images
+- capture compressed TGA images
+- record input to some binary format (append struct to file...)
+- "make video" plays back recorded output, disables VSYNC and outputs TGA files
+- process the TGA files into a video
 
 TODO:
+- switch screen resolution to 1280x720 (this is the resolution of the screens at GDC...)
+- record video at this resolution and see how it looks in keynote
+- find a way to automate the conversion from TGA -> MOV -> M4V
+- add safety features so input recordings are not lost, eg. copy the input recording
+  along with the executable and the video into the directory where the movie lives
+
+HOUSEKEEPING:
 - get tests working again (ideally, link network tests in with engine tests and run in one go...)
-- generalize keyboard input processing so I have access to all keys
-- find a way to record input and play back
-- find a way to output video at 60HZ and process it into a video
+
+visualization:
 - find a way to render high quality text
 - ideally, find a way to combine OpenGL and Cocoa rendering and compositing
   (will make it easier to visualize and show debug functionality!)
+- make cubes look better. perhaps a rounded corner mesh for cubes could be created in modo?
 
 visual things to show:
 - splitscreen demo: synchronize left -> right with latency

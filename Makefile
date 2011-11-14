@@ -5,6 +5,8 @@
 
 all: demo
 
+#optflags     := -DDEBUG
+
 optflags     := -DNDEBUG -march=core2 -mfpmath=sse -sse3 -O3 -g -ffast-math -fno-math-errno -funsafe-math-optimizations -ffinite-math-only -fno-trapping-math -fsingle-precision-constant
 
 makefile     := Makefile
@@ -40,8 +42,16 @@ UnitTest: UnitTest.o network/output/libnetwork.a $(test_objs) $(shared_objs) $(s
 Demo: Demo.o network/output/libnetwork.a $(client_objs) $(server_objs) $(shared_objs)
 	$(compiler) Demo.o -o $@ $(flags) $(optflags) -Lnetwork/output $(ndl_objs) $(client_objs) $(server_objs) $(shared_objs) $(frameworks) $(libs)
 
-demo : Demo
+demo: Demo
+	@mkdir -pv output
+	@rm -f output/*.tga
 	./Demo
+
+playback: Demo
+	./Demo playback
+
+video: Demo
+	./Demo playback video
 
 loc: 
 	wc -l *.cpp *.h network/*.h network/*.cpp tests/*.h tests/*.cpp client/*.h client/*.cpp server/*.h server/*.cpp shared/*.h shared/*.cpp 
@@ -54,7 +64,7 @@ clean:
 	make -C network clean
 	rm -rf *.a *.d *.o *.h.gch *.app \
 	$(client_objs) $(server_objs) $(shared_objs) $(test_objs) \
-	*.bak *.zip *.bin *.dSYM UnitTest Demo
+	*.bak *.zip *.bin *.dSYM UnitTest Demo output
 
 files_to_zip := $(wildcard *.rb) $(wildcard *.cpp) $(wildcard *.h) $(wildcard tests/*.cpp) $(wildcard tests/*.h) $(wildcard demos/*.h) Makefile
 

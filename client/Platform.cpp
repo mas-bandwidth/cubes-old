@@ -369,6 +369,7 @@ namespace platform
 	static pascal OSErr quitEventHandler( const AppleEvent *appleEvt, AppleEvent *reply, SInt32 refcon )
 	#endif
 	{
+        CloseDisplay();
 		exit( 0 );
 		return false;
 	}
@@ -621,7 +622,9 @@ namespace platform
 	 	height = CGDisplayPixelsHigh( displayId );
 	}
 
-	bool OpenDisplay( const char title[], int width, int height )
+    static CGDisplayModeRef originalDisplayMode;
+
+	bool OpenDisplay( const char title[], int width, int height, int refresh )
 	{
 		// install keyboard handler
 	
@@ -637,10 +640,53 @@ namespace platform
 
 		InstallApplicationEventHandler( handlerUPP, 2, eventTypes, NULL, NULL );
 
+        // capture the display and save the original display mode so we can restore it
+
+        CGDirectDisplayID displayId = GetDisplayId();
+
+        CGDisplayErr err = CGDisplayCapture( displayId );
+        if ( err != kCGErrorSuccess )
+        {
+            printf( "error: CGDisplayCapture failed\n" );
+            return false;
+        }
+
+        originalDisplayMode = CGDisplayCopyDisplayMode( displayId );    
+
+        // search for a display mode matching the resolution and refresh rate requested
+
+        CFArrayRef allModes = CGDisplayCopyAllDisplayModes( kCGDirectMainDisplay, NULL );
+        CGDisplayModeRef matchingMode = NULL;
+        for ( int i = 0; i < CFArrayGetCount(allModes); i++ )
+        {
+            CGDisplayModeRef mode = (CGDisplayModeRef) CFArrayGetValueAtIndex( allModes, i );
+            const int mode_width = CGDisplayModeGetWidth( mode );
+            const int mode_height = CGDisplayModeGetHeight( mode );
+            const int mode_refresh = CGDisplayModeGetRefreshRate( mode );
+            //printf( "width = %d, height = %d, refresh = %d\n", mode_width, mode_height, mode_refresh );
+            if ( mode_width == width && mode_height == height && ( mode_refresh == refresh || mode_refresh == 0 ) )
+            {
+                matchingMode = mode;
+                break;
+            }
+        }
+
+        if ( matchingMode == NULL )
+        {
+            printf( "error: could not find a matching display mode\n" );
+            return false;
+        }
+
+        // actually set the display mode
+
+        CGDisplayConfigRef displayConfig;
+        CGBeginDisplayConfiguration( &displayConfig );
+        CGConfigureDisplayWithDisplayMode( displayConfig, displayId, matchingMode, NULL );
+        CGConfigureDisplayFadeEffect( displayConfig, 0.15f, 0.1f, 0.0f, 0.0f, 0.0f );
+        CGCompleteDisplayConfiguration( displayConfig, NULL );
+
 		// initialize fullscreen CGL
 	
-		CGDirectDisplayID displayId = GetDisplayId();
-		CGDisplayErr err = CGDisplayCapture( displayId );
 		if ( err != kCGErrorSuccess )
 		{
 			printf( "error: CGCaptureAllDisplays failed\n" );
@@ -709,7 +755,7 @@ namespace platform
 		glClearStencil( 0 );
 		glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );		
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
-		platform::UpdateDisplay();
+		platform::UpdateDisplay( 1 );
 	}
 
 	void UpdateDisplay( int interval )
@@ -737,11 +783,11 @@ namespace platform
 	void CloseDisplay()
 	{	
 		printf( "close display\n" );
-		
-		CGLSetCurrentContext( NULL );
-		CGLClearDrawable( contextObj );
-		CGLDestroyContext( contextObj );
-		CGReleaseAllDisplays();
+
+        CGReleaseAllDisplays();
+        CGRestorePermanentDisplayConfiguration();
+        CGLSetCurrentContext( NULL );
+        CGLDestroyContext( contextObj );
 	}
 
 	// basic keyboard input

@@ -7,6 +7,97 @@
 #include "PreCompiled.h"
 #include "network/netSockets.h"
 #include "demos/SingleplayerDemo.h"
+
+#if PLATFORM == PLATFORM_MAC
+#include <OpenGl/gl.h>
+#include <OpenGl/glu.h>
+#include <OpenGL/glext.h>
+#include <OpenGL/OpenGL.h>
+#endif
+
+bool WriteTGA( const char filename[], int width, int height, uint8_t * ptr )
+{
+    FILE * file = fopen( filename, "wb" );
+    if ( !file )
+        return false;
+
+    putc( 0, file );
+    putc( 0, file );
+    putc( 10, file );                        /* compressed RGB */
+    putc( 0, file ); putc( 0, file );
+    putc( 0, file ); putc( 0, file );
+    putc( 0, file );
+    putc( 0, file ); putc( 0, file );           /* X origin */
+    putc( 0, file ); putc( 0, file );           /* y origin */
+    putc( ( width & 0x00FF ),file );
+    putc( ( width & 0xFF00 ) >> 8,file );
+    putc( ( height & 0x00FF ), file );
+    putc( ( height & 0xFF00 ) >> 8, file );
+    putc( 24, file );                         /* 24 bit bitmap */
+    putc( 0, file );
+
+    for ( int y = 0; y < height; ++y )
+    {
+        uint8_t * line = ptr + width * 3 * y;
+        uint8_t * end_of_line = line + width * 3;
+        uint8_t * pixel = line;
+        while ( true )
+        {
+            if ( pixel >= end_of_line )
+                break;
+
+            uint8_t * start = pixel;
+            uint8_t * finish = pixel + 128 * 3;
+            if ( finish > end_of_line )
+                finish = end_of_line;
+            uint32_t previous = ( pixel[0] << 16 ) | ( pixel[1] << 8 ) | pixel[2];
+            pixel += 3;
+            int counter = 1;
+
+            // RLE packet
+            while ( pixel < finish )
+            {
+                NET_ASSERT( pixel < end_of_line );
+                uint32_t current = ( pixel[0] << 16 ) | ( pixel[1] << 8 ) | pixel[2];
+                if ( current != previous )
+                    break;
+                previous = current;
+                pixel += 3;
+                counter++;
+            }
+            if ( counter > 1 )
+            {
+                NET_ASSERT( counter <= 128 );
+                putc( uint8_t( counter - 1 ) | 128, file );
+                putc( start[0], file );
+                putc( start[1], file );
+                putc( start[2], file );
+                continue;
+            }
+
+            // RAW packet
+            while ( pixel < finish )
+            {
+                NET_ASSERT( pixel < end_of_line );
+                uint32_t current = ( pixel[0] << 16 ) | ( pixel[1] << 8 ) | pixel[2];
+                if ( current == previous )
+                    break;
+                previous = current;
+                pixel += 3;
+                counter++;
+            }
+            NET_ASSERT( counter >= 1 );
+            NET_ASSERT( counter <= 128 );
+            putc( uint8_t( counter - 1 ), file );
+            fwrite( start, counter * 3, 1, file );
+        }
+    }
+
+    fclose( file );
+
+    return true;
+}
+
 /*
 #include "demos/MultiplayerDemo.h"
 #include "demos/InterpolationDemo.h"
@@ -46,6 +137,24 @@ int main( int argc, char * argv[] )
 {	
 	printf( "networked physics demo\n" );
 
+    bool shadows = true;
+    bool playback = false;
+    bool video = false;
+
+    for ( int i = 1; i < argc; ++i )
+    {
+        if ( strcmp( argv[i], "playback" ) == 0 )
+        {
+            printf( "playback\n" );
+            playback = true;
+        }
+        else if ( strcmp( argv[i], "video" ) == 0 )
+        {
+            printf( "video\n" );
+            video = true;
+        }
+    }
+
 	net::InitializeSockets();
 	while ( !net::IsInitialized() )
 	{
@@ -56,8 +165,14 @@ int main( int argc, char * argv[] )
 
 #ifndef PROFILE
 	
+    /*
 	int displayWidth, displayHeight;
 	GetDisplayResolution( displayWidth, displayHeight );
+    */
+
+    const int displayWidth = 1280;
+    const int displayHeight = 800;//720;
+
 	printf( "display resolution is %d x %d\n", displayWidth, displayHeight );
 
 	HideMouseCursor();
@@ -78,17 +193,54 @@ int main( int argc, char * argv[] )
 	demo->InitializeRender( displayWidth, displayHeight );
     #endif
 
-	bool shadows = true;
-
 	uint32_t frame = 0;
-	
+
+    // create 2 pixel buffer objects, you need to delete them when program exits.
+    // glBufferDataARB with NULL pointer reserves only memory space.
+    const int NumPBOs = 2;
+    GLuint pboIds[NumPBOs];
+    int index = 0;
+    const int dataSize = displayWidth * displayHeight * 3;
+    if ( video )
+    {
+        glGenBuffersARB( NumPBOs, pboIds );
+        for ( int i = 0; i < NumPBOs; ++i )
+        {
+            glBindBufferARB( GL_PIXEL_UNPACK_BUFFER_ARB, pboIds[i] );
+            glBufferDataARB( GL_PIXEL_UNPACK_BUFFER_ARB, dataSize, 0, GL_STREAM_DRAW_ARB );
+        }
+        glBindBufferARB( GL_PIXEL_UNPACK_BUFFER_ARB, 0 );
+    }
+
+    // record input to a file
+    // read it back in playback mode for recording video
+    FILE * inputFile = fopen( "output/recordedInputs", playback ? "rb" : "wb" );
+    if ( !inputFile )
+    {
+        printf( "failed to open input file\n" );
+        return false;
+    }
+
 	while ( true )
 	{
 		#ifdef PROFILE
 		printf( "profiling frame %d\n", frame );
 		#endif
 		
-		platform::Input input = platform::Input::Sample();
+		platform::Input input;
+        
+        if ( !playback )
+        {
+            input = platform::Input::Sample();
+            fwrite( &input, sizeof( platform::Input ), 1, inputFile );
+            fflush( inputFile );
+        }
+        else
+        {
+            const int size = sizeof( platform::Input );
+            if ( !fread( &input, size, 1, inputFile ) )
+                return 1;
+        }
 
 		#ifdef PROFILE
 		if ( frame > 500 )
@@ -173,18 +325,53 @@ int main( int argc, char * argv[] )
 		}
 		escapeDownLastFrame = input.escape;
 		
-		if ( frame > 50 )
-		{
-			demo->ProcessInput( !input.alt ? input : platform::Input() );
-			demo->Update( DeltaTime );
-            demo->WaitForSim();
-		}
+		demo->ProcessInput( !input.alt ? input : platform::Input() );
+
+		demo->Update( DeltaTime );
+
+        if ( video )
+        {
+            // "index" is used to read pixels from framebuffer to a PBO
+            // "nextIndex" is used to update pixels in the other PBO
+            index = ( index + 1 ) % NumPBOs;
+            int prevIndex = ( index + NumPBOs - 1 ) % NumPBOs;
+
+            // set the target framebuffer to read
+            glReadBuffer( GL_FRONT );
+
+            // read pixels from framebuffer to PBO
+            // glReadPixels() should return immediately.
+            glBindBufferARB( GL_PIXEL_PACK_BUFFER_ARB, pboIds[index] );
+            glReadPixels( 0, 0, displayWidth, displayHeight, GL_BGR, GL_UNSIGNED_BYTE, 0 );
+            if ( frame > (unsigned) NumPBOs )
+            {
+                // map the PBO to process its data by CPU
+                glBindBufferARB( GL_PIXEL_PACK_BUFFER_ARB, pboIds[prevIndex] );
+                GLubyte * ptr = (GLubyte*) glMapBufferARB( GL_PIXEL_PACK_BUFFER_ARB,
+                                                           GL_READ_ONLY_ARB );
+                if ( ptr )
+                {
+                    char filename[256];
+                    sprintf( filename, "output/frame-%05d.tga", frame - NumPBOs );
+                    WriteTGA( filename, displayWidth, displayHeight, ptr );
+                    glUnmapBufferARB( GL_PIXEL_PACK_BUFFER_ARB );
+                }
+            }
+
+            // back to conventional pixel operation
+            glBindBufferARB( GL_PIXEL_PACK_BUFFER_ARB, 0 );
+        }
+
+        demo->WaitForSim();
 		
 		#ifndef PROFILE
-		demo->Render( DeltaTime, shadows );
-		UpdateDisplay( 1 );
+
+    		demo->Render( DeltaTime, shadows );
+
+            UpdateDisplay( video ? 0 : 1 );
+        
 		#endif
-				
+
 		frame ++;
 	}
 

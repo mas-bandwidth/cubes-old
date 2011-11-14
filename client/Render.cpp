@@ -423,7 +423,7 @@ namespace render
 			glEnableClientState( GL_VERTEX_ARRAY );
 			glEnableClientState( GL_NORMAL_ARRAY );
 
-            #define BUFFER_OFFSET(i) ((char *)NULL + (i))
+            #define BUFFER_OFFSET(i) ( (char*)NULL + (i) )
             glVertexPointer( 3, GL_FLOAT, sizeof(CubeVertex), BUFFER_OFFSET(0) );
             glNormalPointer( GL_FLOAT, sizeof(CubeVertex), BUFFER_OFFSET(12) );
 
