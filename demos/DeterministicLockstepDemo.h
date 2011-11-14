@@ -7,7 +7,7 @@
 #include "demos/Demo.h"
 #include "shared/Hypercube.h"
 
-class SingleplayerDemo : public Demo
+class DeterministicLockstepDemo : public Demo
 {
 private:
 
@@ -24,7 +24,7 @@ public:
 
 	enum { steps = 1024 };
 
-	SingleplayerDemo()
+	DeterministicLockstepDemo()
 	{
 		game::Config config;
 		config.maxObjects = steps * steps + MaxPlayers + 1;
@@ -143,7 +143,7 @@ public:
         workerThread.Join();
         gameInstance->GetViewPacket( viewPacket );
     }
-	
+    	
 	void Render( float deltaTime, bool shadows )
 	{
 		// update the scene to be rendered

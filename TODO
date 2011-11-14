@@ -24,14 +24,25 @@ DONE:
 - write TGA files at 1280x720 resolution skipping past first 40 lines
 - verify exact fit in keynote post handbrake
 
+OPEN SOURCE:
+- identify cool libraries used by "Carbon Studios" and see if any of them
+  can be used in my project, eg. hashing functions (MD5) would be cool for det check.
+
+DEMO VISUALS:
+1. singleplayer demo (done)
+2. deterministic lockstep: not synced at all
+3. deterministic lockstep: synced via input but drifts into error (different delta times...)
+4. deterministic lockstep: in sync and verified by comparing hash of physics state!
+5. interpolation: point sampling
+6. interpolation: linear interpolation
+7. interpolation: spline interpolation (R&D...)
+
 PLANNING:
-- think through all visual things that I want to show and plan what visuals I need
-- once this is done then I can start doing visualizations, diagrams, animations etc.
 
 1. show demo, explain how it works. one million cubes. activation etc. blow. katarami.
 2. splitscreen --- not in sync...
 3. send input across. describe input. sent across in packets. if no packet recieved that frame, hold previous input.
-4. goes out of sync... --> determinism/lockstep discussion
+4. goes out of sync... --> same framerate, determinism/lockstep discussion
 5. interpolation/extrapolation --> describe packet, object ids. interpolation. linear error, additional latency, etc.
 6. run simulation on both sides ---> prioritization. push/pull/serialize. *smoothing*, error reduction.
 7. serialize function, bit packer etc.
@@ -61,12 +72,6 @@ visualization:
 
 visual things to show:
 - splitscreen demo: synchronize left -> right with latency
-- show single cube, tumbling motion (explore interpolation vs. state pushing here?)
-- pushing objects at a distance (blow)
-- groups of objects interacting (katamari)
-- show multiple cubes, explain how engine works, activation etc.
-- side by side demo, with latency
-- just sync the inputs. show it drift out of sync ---> discussion about determinism
 - show updates at 10pps (strobing, point sampling etc.)
 - show interpolation/extrapolation. adds latency. linearization is a problem etc.
 - show prioritized updates (slow down into slow motion and flash as each cube is updated)
