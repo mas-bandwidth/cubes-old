@@ -15,13 +15,16 @@ DONE:
 - record input to some binary format (append struct to file...)
 - "make video" plays back recorded output, disables VSYNC and outputs TGA files
 - process the TGA files into a video
-
-TODO:
 - switch screen resolution to 1280x720 (this is the resolution of the screens at GDC...)
 - record video at this resolution and see how it looks in keynote
-- find a way to automate the conversion from TGA -> MOV -> M4V
-- add safety features so input recordings are not lost, eg. copy the input recording
-  along with the executable and the video into the directory where the movie lives
+- raw MOV file playing back in keynote is jittery (presumably IO bound)
+- exports from quicktime pro 7 are low resolution and export @ 30Hz =p
+- exporting 1280*800 and converting to m4v via hand brake gives good results
+
+PERFECTION:
+- change demo to output exactly at 1280x720 letterboxed (black above/below)
+- write TGA files at 1280x720 resolution skipping past first 40 lines
+- verify exact fit in keynote post handbrake
 
 HOUSEKEEPING:
 - get tests working again (ideally, link network tests in with engine tests and run in one go...)

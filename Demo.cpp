@@ -218,10 +218,11 @@ int main( int argc, char * argv[] )
     if ( !inputFile )
     {
         printf( "failed to open input file\n" );
-        return false;
+        return 1;
     }
 
-	while ( true )
+    bool quit = false;
+	while ( !quit )
 	{
 		#ifdef PROFILE
 		printf( "profiling frame %d\n", frame );
@@ -239,7 +240,7 @@ int main( int argc, char * argv[] )
         {
             const int size = sizeof( platform::Input );
             if ( !fread( &input, size, 1, inputFile ) )
-                return 1;
+                quit = true;
         }
 
 		#ifdef PROFILE
