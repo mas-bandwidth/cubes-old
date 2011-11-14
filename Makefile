@@ -31,8 +31,6 @@ PreCompiled.d : PreCompiled.h network/output/libnetwork.a
 $(pch): PreCompiled.h PreCompiled.d $(makefile) network/output/libnetwork.a
 	$(compiler) PreCompiled.h $(flags)
 
--include PreCompiled.d
-
 %.o: %.cpp $(pch) $(makefile) network/output/libnetwork.a
 	$(compiler) -c $< -o $@ $(flags) $(optflags)
 
