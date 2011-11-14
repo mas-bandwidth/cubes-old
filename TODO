@@ -20,11 +20,35 @@ DONE:
 - raw MOV file playing back in keynote is jittery (presumably IO bound)
 - exports from quicktime pro 7 are low resolution and export @ 30Hz =p
 - exporting 1280*800 and converting to m4v via hand brake gives good results
-
-PERFECTION:
 - change demo to output exactly at 1280x720 letterboxed (black above/below)
 - write TGA files at 1280x720 resolution skipping past first 40 lines
 - verify exact fit in keynote post handbrake
+
+PLANNING:
+- think through all visual things that I want to show and plan what visuals I need
+- once this is done then I can start doing visualizations, diagrams, animations etc.
+
+1. show demo, explain how it works. one million cubes. activation etc. blow. katarami.
+2. splitscreen --- not in sync...
+3. send input across. describe input. sent across in packets. if no packet recieved that frame, hold previous input.
+4. goes out of sync... --> determinism/lockstep discussion
+5. interpolation/extrapolation --> describe packet, object ids. interpolation. linear error, additional latency, etc.
+6. run simulation on both sides ---> prioritization. push/pull/serialize. *smoothing*, error reduction.
+7. serialize function, bit packer etc.
+8. low hanging fruit. object id, reduce to n bits. be smart about local player cube (always first cube), saves 2 bytes per-packet.
+9. at rest optimization. 1 bit at rest. if at rest, assume zero lin/ang vel. (subtle point: at rest flag is synced hard)
+10. quaternion optimization: smallest 3. compare with naive 8.8.8.8 (show drift)
+11. position compression. store nearest 1m quantize. encode xz positions relative to origin. bound z in range
+12. quantize on both sides. gives best quality extrapolation and alerts you when something is going wrong.
+13. bound and quantize linear and angular velocity.
+14. show that we can now be within 64kbit/sec bounds. now switch to optimizing # of objects per-packet
+15. prioritization. higher priority for red objects (moving)
+16. reliability system. confirm position of at rest objects. don't send them. if moved (red), unconfirm them.
+17. frequency optimizations: apply to position z, mostly in this range, sometimes above. very application specific
+18. linear velocity. split apart linear velocity into a direction (unit) and a size -- encode size with variable bits (manual huffman)
+19. angular velocity. same treatment. combine lin/ang velocity for "slow moving" objects
+20. delta encoding. we have a reliability system, try a different strategy -- what about encoding objects relative to prior
+    position?
 
 HOUSEKEEPING:
 - get tests working again (ideally, link network tests in with engine tests and run in one go...)

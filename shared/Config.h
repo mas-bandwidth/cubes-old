@@ -7,6 +7,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define LETTERBOX
 #define WIDESCREEN
 #define SHADOWS
 #define MULTISAMPLING

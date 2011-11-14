@@ -165,13 +165,13 @@ int main( int argc, char * argv[] )
 
 #ifndef PROFILE
 	
-    /*
 	int displayWidth, displayHeight;
 	GetDisplayResolution( displayWidth, displayHeight );
-    */
 
-    const int displayWidth = 1280;
-    const int displayHeight = 800;//720;
+    #ifdef LETTERBOX
+    displayWidth = 1280;
+    displayHeight = 800;
+    #endif
 
 	printf( "display resolution is %d x %d\n", displayWidth, displayHeight );
 
@@ -354,7 +354,11 @@ int main( int argc, char * argv[] )
                 {
                     char filename[256];
                     sprintf( filename, "output/frame-%05d.tga", frame - NumPBOs );
+                    #ifdef LETTERBOX
+                    WriteTGA( filename, displayWidth, displayHeight - 80, ptr + displayWidth * 3 * 40 );
+                    #else
                     WriteTGA( filename, displayWidth, displayHeight, ptr );
+                    #endif
                     glUnmapBufferARB( GL_PIXEL_PACK_BUFFER_ARB );
                 }
             }

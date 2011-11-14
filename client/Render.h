@@ -94,6 +94,8 @@ namespace render
 	
 		void DivideQuadscreen();
 
+        void LetterBox( float pixels );
+
 		math::Vector InverseTransform( const math::Vector & input, const math::Vector & position, const math::Quaternion & orientation, float scale );
 		
 		void EnterScreenSpace();

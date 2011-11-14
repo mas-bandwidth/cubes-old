@@ -175,6 +175,10 @@ public:
 			render->RenderShadowQuad();
 		}
 		#endif
+
+        #ifdef LETTERBOX
+        render->LetterBox( 80 );
+        #endif
 	}
 	
 	void WaitForSim()
