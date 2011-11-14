@@ -76,7 +76,6 @@ zip: Cubes.zip
 commit: clean
 	git add *
 	git commit -a -m "$(m)"
-	git push
 
 deps: Dependencies.d
 depend: Dependencies.d
