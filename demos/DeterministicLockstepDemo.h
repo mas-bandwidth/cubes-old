@@ -11,14 +11,24 @@ class DeterministicLockstepDemo : public Demo
 {
 private:
 
-	game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * gameInstance;
-	GameWorkerThread workerThread;
-	view::Packet viewPacket;
-	view::ObjectManager viewObjectManager;
 	render::Render * render;
-	float t;
-	Camera camera;
-	math::Vector origin;
+
+    struct Instance
+    {
+        game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * game;
+
+        float t;            // NETHACK: using floating point time is a very bad idea
+        Camera camera;
+        math::Vector origin;
+        GameWorkerThread workerThread;
+
+        view::Packet viewPacket;
+        view::ObjectManager viewObjectManager;
+    };
+
+    static const int NumInstances = 2;
+
+    Instance instance[NumInstances];
 	
 public:
 
@@ -43,42 +53,50 @@ public:
 		config.simConfig.AngularDrag = 0.01f;
 		config.simConfig.Friction = 200.0f;
 
-		gameInstance = new game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> ( config );
-		t = 0.0f;
-		origin = math::Vector(0,0,0);
-		render = NULL;
+        for ( int i = 0; i < NumInstances; ++i )
+        {
+    		instance[i].game = new game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> ( config );
+    		instance[i].t = 0.0f;
+    		instance[i].origin = math::Vector(0,0,0);
+        }
+
+        render = NULL;
 	}
 	
 	~DeterministicLockstepDemo()
 	{
-		delete gameInstance;
+        for ( int i = 0; i < NumInstances; ++i )
+		  delete instance[i].game;
 		delete render;
 	}
 	
 	void InitializeWorld()
 	{
-		gameInstance->InitializeBegin();
+		for ( int i = 0; i < NumInstances; ++i )
+        {
+            instance[i].game->InitializeBegin();
 
-		gameInstance->AddPlane( math::Vector(0,0,1), 0 );
+    		instance[i].game->AddPlane( math::Vector(0,0,1), 0 );
 
-		AddCube( gameInstance, 1, math::Vector(0,0,10) );
+    		AddCube( instance[i].game, 1, math::Vector(0,0,10) );
 
-		const int border = 10.0f;
-		const float origin = -steps / 2 + border;
-		const float z = hypercube::NonPlayerCubeSize / 2;
-		const int count = steps - border * 2;
-		for ( int y = 0; y < count; ++y )
-			for ( int x = 0; x < count; ++x )
-				AddCube( gameInstance, 0, math::Vector(x+origin,y+origin,z) );
+    		const int border = 10.0f;
+    		const float origin = -steps / 2 + border;
+    		const float z = hypercube::NonPlayerCubeSize / 2;
+    		const int count = steps - border * 2;
+    		for ( int y = 0; y < count; ++y )
+    			for ( int x = 0; x < count; ++x )
+    				AddCube( instance[i].game, 0, math::Vector(x+origin,y+origin,z) );
 
-		gameInstance->InitializeEnd();
+    		instance[i].game->InitializeEnd();
 
-		gameInstance->OnPlayerJoined( 0 );
-		gameInstance->SetLocalPlayer( 0 );
-		gameInstance->SetPlayerFocus( 0, 1 );
-	
-		gameInstance->SetFlag( game::FLAG_Push );
-		gameInstance->SetFlag( game::FLAG_Pull );
+    		instance[i].game->OnPlayerJoined( 0 );
+    		instance[i].game->SetLocalPlayer( 0 );
+    		instance[i].game->SetPlayerFocus( 0, 1 );
+    	
+    		instance[i].game->SetFlag( game::FLAG_Push );
+    		instance[i].game->SetFlag( game::FLAG_Pull );
+        }
 	}
 	
 	void InitializeRender( int displayWidth, int displayHeight )
@@ -116,72 +134,60 @@ public:
 		gameInput.down = input.down ? 1.0f : 0.0f;
 		gameInput.push = input.space ? 1.0f : 0.0f;
 		gameInput.pull = input.z ? 1.0f : 0.0f;
-		gameInstance->SetPlayerInput( 0, gameInput );
+
+        // NETHACK: todo - actually we want to stagger the input for the second instance
+        for ( int i = 0; i < NumInstances; ++i )
+            instance[i].game->SetPlayerInput( 0, gameInput );
 	}
 	
 	void Update( float deltaTime )
 	{
-		// update camera
-		view::Object * playerCube = viewObjectManager.GetObject( 1 );
-		if ( playerCube )
-			origin = playerCube->position + playerCube->positionError;
-		math::Vector lookat = origin - math::Vector(0,0,1);
-		#ifdef WIDESCREEN
-		math::Vector position = lookat + math::Vector(0,-11,5);
-		#else
-		math::Vector position = lookat + math::Vector(0,-12,6);
-		#endif
-		camera.EaseIn( lookat, position ); 
+        for ( int i = 0; i < NumInstances; ++i )
+        {
+    		// update camera
+    		view::Object * playerCube = instance[i].viewObjectManager.GetObject( 1 );
+    		if ( playerCube )
+    			instance[i].origin = playerCube->position + playerCube->positionError;
+    		math::Vector lookat = instance[i].origin - math::Vector(0,0,1);
+    		#ifdef WIDESCREEN
+    		math::Vector position = lookat + math::Vector(0,-11,5);
+    		#else
+    		math::Vector position = lookat + math::Vector(0,-12,6);
+    		#endif
+    		instance[i].camera.EaseIn( lookat, position ); 
 
-		// start the worker thread
-		workerThread.Start( gameInstance );
-		t += deltaTime;
+    		// start the worker thread
+    		instance[i].workerThread.Start( instance[i].game );
+    		instance[i].t += deltaTime;
+        }
 	}
 
     void WaitForSim()
     {
-        workerThread.Join();
-        gameInstance->GetViewPacket( viewPacket );
+        for ( int i = 0; i < NumInstances; ++i )
+        {
+            instance[i].workerThread.Join();
+            instance[i].game->GetViewPacket( instance[i].viewPacket );
+        }
     }
     	
 	void Render( float deltaTime, bool shadows )
 	{
 		// update the scene to be rendered
 		
-		if ( viewPacket.objectCount >= 1 )
-		{
-			view::ObjectUpdate updates[MaxViewObjects];
-			getViewObjectUpdates( updates, viewPacket );
-			viewObjectManager.UpdateObjects( updates, viewPacket.objectCount );
-		}
-		viewObjectManager.ExtrapolateObjects( deltaTime );
-		viewObjectManager.Update( deltaTime );
+        for ( int i = 0; i < NumInstances; ++i )
+        {
+    		if ( instance[i].viewPacket.objectCount >= 1 )
+    		{
+    			view::ObjectUpdate updates[MaxViewObjects];
+    			getViewObjectUpdates( updates, instance[i].viewPacket );
+    			instance[i].viewObjectManager.UpdateObjects( updates, instance[i].viewPacket.objectCount );
+    		}
 
-        /*
-		// render the scene on the le
-		
-		render->ClearScreen();
+    		instance[i].viewObjectManager.ExtrapolateObjects( deltaTime );
 
-		Cubes cubes;
-		viewObjectManager.GetRenderState( cubes );
-
-		int width = render->GetDisplayWidth();
-		int height = render->GetDisplayHeight();
-
-		render->BeginScene( 0, 0, width, height );
-		setCameraAndLight( render, camera );
-		ActivationArea activationArea;
-		view::setupActivationArea( activationArea, origin, 5.0f, t );
-		render->RenderActivationArea( activationArea, 1.0f );
-		render->RenderCubes( cubes );
-		#ifdef SHADOWS
-		if ( shadows )
-		{
-			render->RenderCubeShadows( cubes );
-			render->RenderShadowQuad();
-		}
-		#endif
-        */
+    		instance[i].viewObjectManager.Update( deltaTime );
+        }
 
         // prepare for rendering
 
@@ -193,11 +199,11 @@ public:
         // render the local view (left)
 
         Cubes cubes;
-        viewObjectManager.GetRenderState( cubes );
-        setCameraAndLight( render, camera );
+        instance[0].viewObjectManager.GetRenderState( cubes );
+        setCameraAndLight( render, instance[0].camera );
         render->BeginScene( 0, 0, width/2, height );
         ActivationArea activationArea;
-        setupActivationArea( activationArea, origin, 5.0f, t );
+        setupActivationArea( activationArea, instance[0].origin, 5.0f, instance[0].t );
         render->RenderActivationArea( activationArea, 1.0f );
         render->RenderCubes( cubes );
         #ifdef SHADOWS
@@ -207,10 +213,10 @@ public:
 
         // render the remote view (right)
 
-//        viewObjectManager[1].GetRenderState( cubes, true );
-        setCameraAndLight( render, camera );
+        instance[1].viewObjectManager.GetRenderState( cubes );
+        setCameraAndLight( render, instance[1].camera );
         render->BeginScene( width/2, 0, width, height );
-        setupActivationArea( activationArea, origin, 5.0f, t );
+        setupActivationArea( activationArea, instance[1].origin, 5.0f, instance[0].t );
         render->RenderActivationArea( activationArea, 1.0f );
         render->RenderCubes( cubes );
         #ifdef SHADOWS

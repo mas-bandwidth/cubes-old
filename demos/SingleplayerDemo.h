@@ -13,13 +13,14 @@ private:
 
 	game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * gameInstance;
 	GameWorkerThread workerThread;
-	view::Packet viewPacket;
-	view::ObjectManager viewObjectManager;
 	render::Render * render;
-	float t;
+	float t;           // NETHACK: floating point time is a very bad idea
 	Camera camera;
 	math::Vector origin;
-	
+
+    view::Packet viewPacket;
+    view::ObjectManager viewObjectManager;
+    	
 public:
 
 	enum { steps = 1024 };

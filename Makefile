@@ -3,7 +3,7 @@
 # note: configuration for ODE build
 #./configure CFLAGS="-march=core2 -mfpmath=sse -sse3 -O3" CXXFLAGS="-march=core2 -mfpmath=sse -sse3 -O3" --with-trimesh=none --with-drawstuff=none
 
-all: demo
+default: demo
 
 #optflags     := -DDEBUG
 

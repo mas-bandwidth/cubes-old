@@ -24,9 +24,7 @@ DONE:
 - write TGA files at 1280x720 resolution skipping past first 40 lines
 - verify exact fit in keynote post handbrake
 
-OPEN SOURCE:
-- identify cool libraries used by "Carbon Studios" and see if any of them
-  can be used in my project, eg. hashing functions (MD5) would be cool for det check.
+TODO:
 
 DEMO VISUALS:
 1. singleplayer demo (done)
@@ -35,7 +33,7 @@ DEMO VISUALS:
 4. deterministic lockstep: in sync and verified by comparing hash of physics state!
 5. interpolation: point sampling
 6. interpolation: linear interpolation
-7. interpolation: spline interpolation (R&D...)
+7. interpolation: linear extrapolation, ballistic extrapolation
 
 PLANNING:
 
@@ -63,12 +61,9 @@ PLANNING:
 
 HOUSEKEEPING:
 - get tests working again (ideally, link network tests in with engine tests and run in one go...)
-
-visualization:
-- find a way to render high quality text
-- ideally, find a way to combine OpenGL and Cocoa rendering and compositing
-  (will make it easier to visualize and show debug functionality!)
-- make cubes look better. perhaps a rounded corner mesh for cubes could be created in modo?
+- find a way to get truetype font rendering to textures working
+- identify cool libraries used by "Carbon Studios" and see if any of them
+  can be used in my project, eg. hashing functions (MD5) would be cool for det check.
 
 visual things to show:
 - splitscreen demo: synchronize left -> right with latency
@@ -92,7 +87,6 @@ cool things to share:
   or have a desynced at rest state between machines. hand coded at rest update.
 - latency cost for interpolation
 - problems with packet loss => extrapolation
-- study the extrapolation code from jon watte (EPIC)
 
 key points:
 - i want to record video for the talk instead of running a live demo = less stress, better presentation post-GDC
