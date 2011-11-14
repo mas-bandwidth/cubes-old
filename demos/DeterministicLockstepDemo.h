@@ -49,7 +49,7 @@ public:
 		render = NULL;
 	}
 	
-	~SingleplayerDemo()
+	~DeterministicLockstepDemo()
 	{
 		delete gameInstance;
 		delete render;
@@ -157,7 +157,8 @@ public:
 		viewObjectManager.ExtrapolateObjects( deltaTime );
 		viewObjectManager.Update( deltaTime );
 
-		// render the scene
+        /*
+		// render the scene on the le
 		
 		render->ClearScreen();
 
@@ -180,6 +181,55 @@ public:
 			render->RenderShadowQuad();
 		}
 		#endif
+        */
+
+        // prepare for rendering
+
+        render->ClearScreen();
+
+        int width = render->GetDisplayWidth();
+        int height = render->GetDisplayHeight();
+
+        // render the local view (left)
+
+        Cubes cubes;
+        viewObjectManager.GetRenderState( cubes );
+        setCameraAndLight( render, camera );
+        render->BeginScene( 0, 0, width/2, height );
+        ActivationArea activationArea;
+        setupActivationArea( activationArea, origin, 5.0f, t );
+        render->RenderActivationArea( activationArea, 1.0f );
+        render->RenderCubes( cubes );
+        #ifdef SHADOWS
+        if ( shadows )
+            render->RenderCubeShadows( cubes );
+        #endif
+
+        // render the remote view (right)
+
+//        viewObjectManager[1].GetRenderState( cubes, true );
+        setCameraAndLight( render, camera );
+        render->BeginScene( width/2, 0, width, height );
+        setupActivationArea( activationArea, origin, 5.0f, t );
+        render->RenderActivationArea( activationArea, 1.0f );
+        render->RenderCubes( cubes );
+        #ifdef SHADOWS
+        if ( shadows )
+            render->RenderCubeShadows( cubes );
+        #endif
+
+        // shadow quad on top
+
+        #ifdef SHADOWS
+        if ( shadows )
+            render->RenderShadowQuad();
+        #endif
+
+        // divide splitscreen
+
+        render->DivideSplitscreen();
+
+        // letterbox last of all
 
         #ifdef LETTERBOX
         render->LetterBox( 80 );

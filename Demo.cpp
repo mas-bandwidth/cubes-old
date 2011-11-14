@@ -7,6 +7,7 @@
 #include "PreCompiled.h"
 #include "network/netSockets.h"
 #include "demos/SingleplayerDemo.h"
+#include "demos/DeterministicLockstepDemo.h"
 
 #if PLATFORM == PLATFORM_MAC
 #include <OpenGl/gl.h>
@@ -14,6 +15,17 @@
 #include <OpenGL/glext.h>
 #include <OpenGL/OpenGL.h>
 #endif
+
+Demo * CreateDemo( int index )
+{
+	if ( index == 0 )
+		return new SingleplayerDemo();
+
+    if ( index == 1 )
+        return new DeterministicLockstepDemo();
+
+	return NULL;
+}
 
 bool WriteTGA( const char filename[], int width, int height, uint8_t * ptr )
 {
@@ -96,39 +108,6 @@ bool WriteTGA( const char filename[], int width, int height, uint8_t * ptr )
     fclose( file );
 
     return true;
-}
-
-/*
-#include "demos/MultiplayerDemo.h"
-#include "demos/InterpolationDemo.h"
-#include "demos/StateReplicationDemo.h"
-#include "demos/AuthorityDemo.h"
-#include "demos/CorrectionsDemo.h"
-*/
-
-Demo * CreateDemo( int index )
-{
-	if ( index == 0 )
-		return new SingleplayerDemo();
-
-/*		
-	if ( index == 1 )
-		return new MultiplayerDemo();
-		
-	if ( index == 2 )
-		return new InterpolationDemo();
-		
-	if ( index == 3 )
-		return new StateReplicationDemo();
-		
-	if ( index == 4 )
-		return new AuthorityDemo();
-		
-	if ( index == 5 )
-		return new CorrectionsDemo();
-*/
-
-	return NULL;
 }
 
 //#define PROFILE

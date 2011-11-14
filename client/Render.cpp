@@ -700,7 +700,7 @@ namespace render
 	
 		const float s = width / 2;
 		const float h = ( height - s ) / 2;
-		const float thickness = width * 0.0015f;
+		const float thickness = width * 0.0025f;
 	
 		EnterRealScreenSpace( width, height );
 	
@@ -741,7 +741,7 @@ namespace render
 	
 		const float s = height / 2;
 		const float w = ( width - s*2 ) / 2;
-		const float thickness = width * 0.0015f;
+        const float thickness = width * 0.0025f;
 	
 		EnterRealScreenSpace( width, height );
 	
