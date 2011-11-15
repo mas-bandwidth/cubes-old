@@ -36,12 +36,14 @@ DONE:
 - linear interpolation demo
 - extrapolation demo
 - need to get the authority red color solid in interpolation demo
-
-TODO:
 - render should be a global object passed TO the demo, not owned by
 - letterboxing should be applied post render by demo.cpp
 - clear display should respect letterboxing on switching demos
-- perhaps instead of splitscreen, we could show the cubes overlaid (ghosted) to show the blah
+
+TODO:
+- show prioritized updates (slow down into slow motion and flash as each cube is updated)
+- demonstrate quantization jitter (both for position + 0.5f, and for quaternion using shit technique 8.8.8.8) ==> quantize on both sides
+- perhaps instead of splitscreen, we could show the cubes overlaid (ghosted) to show the diff
 
 DEMO VISUALS:
 1. singleplayer demo (done)
@@ -87,13 +89,6 @@ HOUSEKEEPING:
 - add hash query functions to game, simulation, activation system etc. hash the entire state and verify
   that the game is deterministic on playback. recording inputs and save the hashes. compare hashes on frames
   during playback to verify deterministic.
-
-visual things to show:
-- splitscreen demo: synchronize left -> right with latency
-- show updates at 10pps (strobing, point sampling etc.)
-- show interpolation/extrapolation. adds latency. linearization is a problem etc.
-- show prioritized updates (slow down into slow motion and flash as each cube is updated)
-- demonstrate quantization jitter (both for position + 0.5f, and for quaternion using shit technique 8.8.8.8) ==> quantize on both sides
 
 cool things to share:
 - how objects are identified over the network (object id)
