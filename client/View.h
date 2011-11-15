@@ -136,7 +136,7 @@ namespace view
 
 	void setupActivationArea( render::ActivationArea & activationArea, const math::Vector & origin, float radius, float t );
 
-	void setCameraAndLight( render::Render * render, const Camera & camera );
+	void setCameraAndLight( render::Interface * interface, const Camera & camera );
 }
 
 #endif

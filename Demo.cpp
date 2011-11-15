@@ -17,6 +17,8 @@
 #include <OpenGL/OpenGL.h>
 #endif
 
+render::Interface * renderInterface = NULL;
+
 Demo * CreateDemo( int index )
 {
 	if ( index == 0 )
@@ -174,9 +176,10 @@ int main( int argc, char * argv[] )
 	int currentDemo = 0;
 	Demo * demo = CreateDemo( 0 );
 	assert( demo );
-	demo->InitializeWorld();	
+	demo->InitializeWorld();
+    renderInterface = new render::Interface( displayWidth, displayHeight );	
     #ifndef PROFILE
-	demo->InitializeRender( displayWidth, displayHeight );
+	demo->SetRenderInterface( renderInterface );
     #endif
 
 	uint32_t frame = 0;
@@ -282,14 +285,19 @@ int main( int argc, char * argv[] )
 				if ( newDemo )
 				{
 					#ifndef PROFILE
-					ClearDisplay( displayWidth, displayHeight );
+                    renderInterface->ClearScreen();
+                    #ifdef LETTERBOX
+                    renderInterface->LetterBox( 80 );
+                    #endif
+					UpdateDisplay( 1 );
 					#endif
+                    
 					delete demo;
 					demo = newDemo;
 					assert( demo );
 					demo->InitializeWorld();
 					#ifndef PROFILE
-					demo->InitializeRender( displayWidth, displayHeight );
+					demo->SetRenderInterface( renderInterface );
 					#endif
 					currentDemo = demoIndex;
 				}
@@ -299,15 +307,20 @@ int main( int argc, char * argv[] )
 		static bool escapeDownLastFrame = false;		
 		if ( input.escape && !escapeDownLastFrame )
 		{
-			#ifndef PROFILE
-			ClearDisplay( displayWidth, displayHeight );
-			#endif
+            #ifndef PROFILE
+            renderInterface->ClearScreen();
+            #ifdef LETTERBOX
+            renderInterface->LetterBox( 80 );
+            #endif
+            UpdateDisplay( 1 );
+            #endif
+
 			delete demo;
 			demo = CreateDemo( currentDemo );
 			assert( demo );
 			demo->InitializeWorld();
 			#ifndef PROFILE
-			demo->InitializeRender( displayWidth, displayHeight );
+			demo->SetRenderInterface( renderInterface );
 			#endif
 		}
 		escapeDownLastFrame = input.escape;
@@ -359,6 +372,10 @@ int main( int argc, char * argv[] )
 
     		demo->Render( DeltaTime, shadows );
 
+            #ifdef LETTERBOX
+            renderInterface->LetterBox( 80 );
+            #endif
+
             UpdateDisplay( video ? 0 : 1 );
         
 		#endif
@@ -371,6 +388,7 @@ int main( int argc, char * argv[] )
     #endif
 
 	delete demo;
+    delete renderInterface;
 
 	printf( "shutdown\n" );
 	

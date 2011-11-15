@@ -81,8 +81,7 @@ public:
 	
 	virtual ~Demo() {}
 	virtual void InitializeWorld() = 0;
-	virtual void InitializeRender( int displayWidth, int displayHeight ) = 0;
-    virtual void ResizeDisplay( int displayWidth, int displayHeight ) = 0;
+	virtual void SetRenderInterface( render::Interface * renderInterface ) = 0;
 	virtual void ProcessInput( const platform::Input & input ) = 0;
 	virtual void Update( float deltaTime ) = 0;
 	virtual void Render( float deltaTime, bool shadows ) = 0;

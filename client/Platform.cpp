@@ -748,16 +748,6 @@ namespace platform
 		return true;
 	}
 	
-	void ClearDisplay( int displayWidth, int displayHeight )
-	{
-		glViewport( 0, 0, displayWidth, displayHeight );
-		glDisable( GL_SCISSOR_TEST );
-		glClearStencil( 0 );
-		glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );		
-		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
-		platform::UpdateDisplay( 1 );
-	}
-
 	void UpdateDisplay( int interval )
 	{
 		// set swap interval

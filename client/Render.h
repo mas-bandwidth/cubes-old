@@ -56,14 +56,14 @@ namespace render
 		Cube cube[MaxViewObjects];
 	};
 
-	// renderer
+	// render interface
 
-	class Render
+	class Interface
 	{
 	public:
 	
-		Render( int displayWidth, int displayHeight );
-		~Render();
+		Interface( int displayWidth, int displayHeight );
+		~Interface();
         
         void ResizeDisplay( int displayWidth, int displayHeight );
 		

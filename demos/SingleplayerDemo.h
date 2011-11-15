@@ -13,7 +13,7 @@ private:
 
 	game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * gameInstance;
 	GameWorkerThread workerThread;
-	render::Render * render;
+	render::Interface * renderInterface;
 	float t;           // NETHACK: floating point time is a very bad idea
 	Camera camera;
 	math::Vector origin;
@@ -47,13 +47,12 @@ public:
 		gameInstance = new game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> ( config );
 		t = 0.0f;
 		origin = math::Vector(0,0,0);
-		render = NULL;
+		renderInterface = NULL;
 	}
 	
 	~SingleplayerDemo()
 	{
 		delete gameInstance;
-		delete render;
 	}
 	
 	void InitializeWorld()
@@ -82,16 +81,11 @@ public:
 		gameInstance->SetFlag( game::FLAG_Pull );
 	}
 	
-	void InitializeRender( int displayWidth, int displayHeight )
+	void SetRenderInterface( render::Interface * renderInterface )
 	{
-		render = new render::Render( displayWidth, displayHeight );
+		this->renderInterface = renderInterface;
 	}
     
-	void ResizeDisplay( int displayWidth, int displayHeight )
-	{
-		render->ResizeDisplay( displayWidth, displayHeight );
-	}
-
 	void AddCube( game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * gameInstance, int player, const math::Vector & position )
 	{
 		hypercube::DatabaseObject object;
@@ -162,30 +156,26 @@ public:
 
 		// render the scene
 		
-		render->ClearScreen();
+		renderInterface->ClearScreen();
 
 		Cubes cubes;
 		viewObjectManager.GetRenderState( cubes );
 
-		int width = render->GetDisplayWidth();
-		int height = render->GetDisplayHeight();
+		int width = renderInterface->GetDisplayWidth();
+		int height = renderInterface->GetDisplayHeight();
 
-		render->BeginScene( 0, 0, width, height );
-		setCameraAndLight( render, camera );
+		renderInterface->BeginScene( 0, 0, width, height );
+		setCameraAndLight( renderInterface, camera );
 		ActivationArea activationArea;
 		view::setupActivationArea( activationArea, origin, 5.0f, t );
-		render->RenderActivationArea( activationArea, 1.0f );
-		render->RenderCubes( cubes );
+		renderInterface->RenderActivationArea( activationArea, 1.0f );
+		renderInterface->RenderCubes( cubes );
 		#ifdef SHADOWS
 		if ( shadows )
 		{
-			render->RenderCubeShadows( cubes );
-			render->RenderShadowQuad();
+			renderInterface->RenderCubeShadows( cubes );
+			renderInterface->RenderShadowQuad();
 		}
 		#endif
-
-        #ifdef LETTERBOX
-        render->LetterBox( 80 );
-        #endif
 	}
 };

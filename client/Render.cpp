@@ -87,7 +87,7 @@ namespace render
 
 	// -----------------------------------------
 
-	Render::Render( int displayWidth, int displayHeight )
+	Interface::Interface( int displayWidth, int displayHeight )
 	{
 		this->displayWidth = displayWidth;
 		this->displayHeight = displayHeight;
@@ -103,41 +103,41 @@ namespace render
 		this->impl = new RenderImpl();
     }
 
-	Render::~Render()
+	Interface::~Interface()
 	{
 		delete impl;
 		impl = NULL;
 	}
     
-    void Render::ResizeDisplay( int displayWidth, int displayHeight )
+    void Interface::ResizeDisplay( int displayWidth, int displayHeight )
     {
         this->displayWidth = displayWidth;
         this->displayHeight = displayHeight;
     }
 	
-	int Render::GetDisplayWidth() const
+	int Interface::GetDisplayWidth() const
 	{
 		return displayWidth;
 	}
 	
-	int Render::GetDisplayHeight() const
+	int Interface::GetDisplayHeight() const
 	{
 		return displayHeight;
 	}
 
-	void Render::SetLightPosition( const math::Vector & position )
+	void Interface::SetLightPosition( const math::Vector & position )
 	{
 		lightPosition = position;
 	}
 
-	void Render::SetCamera( const math::Vector & position, const math::Vector & lookAt, const math::Vector & up )
+	void Interface::SetCamera( const math::Vector & position, const math::Vector & lookAt, const math::Vector & up )
 	{
 		cameraPosition = position;
 		cameraLookAt = lookAt;
 		cameraUp = up;
 	}
 
-	void Render::ClearScreen()
+	void Interface::ClearScreen()
 	{
 		glViewport( 0, 0, displayWidth, displayHeight );
 		glDisable( GL_SCISSOR_TEST );
@@ -146,7 +146,7 @@ namespace render
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
 	}
 
-	void Render::BeginScene( float x1, float y1, float x2, float y2 )
+	void Interface::BeginScene( float x1, float y1, float x2, float y2 )
 	{
 		// setup viewport & scissor
 
@@ -199,7 +199,7 @@ namespace render
 	    glDepthFunc( GL_LEQUAL );
 	}
  
-	void Render::RenderFrameTime( float renderTime, float simTime, float frameTime )
+	void Interface::RenderFrameTime( float renderTime, float simTime, float frameTime )
 	{
 		glDisable( GL_LIGHTING );
 	    glDisable( GL_CULL_FACE );
@@ -261,7 +261,7 @@ namespace render
 		glEnd();
 	}
 
-	void Render::RenderDroppedFrames( int simDroppedFrames, int netDroppedFrames, int viewDroppedFrames )
+	void Interface::RenderDroppedFrames( int simDroppedFrames, int netDroppedFrames, int viewDroppedFrames )
 	{
 		glDisable( GL_DEPTH_TEST );
 
@@ -326,7 +326,7 @@ namespace render
 		glDisable( GL_BLEND );
 	}
 
-	void Render::RenderActivationArea( const ActivationArea & activationArea, float alpha )
+	void Interface::RenderActivationArea( const ActivationArea & activationArea, float alpha )
 	{
 	    glDisable( GL_CULL_FACE );
 		glDisable( GL_DEPTH_TEST );
@@ -403,7 +403,7 @@ namespace render
 		}
 	}
             
-	void Render::RenderCubes( const Cubes & cubes, float alpha  )
+	void Interface::RenderCubes( const Cubes & cubes, float alpha  )
 	{
 #ifndef DEBUG_SHADOW_VOLUMES
         
@@ -521,7 +521,7 @@ namespace render
         }
     }
 
-	void Render::RenderCubeShadows( const Cubes & cubes )
+	void Interface::RenderCubeShadows( const Cubes & cubes )
 	{
 		#ifdef DEBUG_SHADOW_VOLUMES
 
@@ -653,7 +653,7 @@ namespace render
 		#endif
     }
     
-	void Render::RenderShadowQuad()
+	void Interface::RenderShadowQuad()
 	{
 		#if !defined DEBUG_SHADOW_VOLUMES
 
@@ -690,7 +690,7 @@ namespace render
         #endif
 	}
 
-	void Render::DivideSplitscreen()
+	void Interface::DivideSplitscreen()
 	{
 		float width = displayWidth;
 		float height = displayHeight;
@@ -699,7 +699,7 @@ namespace render
 		glDisable( GL_SCISSOR_TEST );
 	
 		const float s = width / 2;
-		const float h = ( height - s ) / 2;
+//		const float h = ( height - s ) / 2;
 		const float thickness = width * 0.0025f;
 	
 		EnterRealScreenSpace( width, height );
@@ -716,6 +716,7 @@ namespace render
 			glVertex2f( s + thickness, height );
 			glVertex2f( s - thickness, height );
 
+            /*
 			glVertex2f( 0, 0 );
 			glVertex2f( width, 0 );
 			glVertex2f( width, h );
@@ -725,13 +726,14 @@ namespace render
 			glVertex2f( width, height - h );
 			glVertex2f( width, height );
 			glVertex2f( 0, height );
+            */
 	
 		glEnd();
 	
 		LeaveScreenSpace();
 	}
 
-	void Render::DivideQuadscreen()
+	void Interface::DivideQuadscreen()
 	{
 		float width = displayWidth;
 		float height = displayHeight;
@@ -777,7 +779,7 @@ namespace render
 		LeaveScreenSpace();
 	}
 
-    void Render::LetterBox( float pixels )
+    void Interface::LetterBox( float pixels )
     {
         float width = displayWidth;
         float height = displayHeight;
@@ -813,7 +815,7 @@ namespace render
 
 	// ------------------------------------------------------------
 
-	math::Vector Render::InverseTransform( const math::Vector & input, const math::Vector & position, const math::Quaternion & orientation, float scale )
+	math::Vector Interface::InverseTransform( const math::Vector & input, const math::Vector & position, const math::Quaternion & orientation, float scale )
 	{
 		assert( scale >= 0.0f );
 	
@@ -824,7 +826,7 @@ namespace render
 		return output;
 	}
 	
-	void Render::EnterScreenSpace()
+	void Interface::EnterScreenSpace()
 	{
 		glViewport( 0, 0, displayWidth, displayHeight );
 		glScissor( 0, 0, displayWidth, displayHeight );
@@ -839,7 +841,7 @@ namespace render
 	    glLoadIdentity();
 	}
 
-	void Render::EnterRealScreenSpace( float width, float height )
+	void Interface::EnterRealScreenSpace( float width, float height )
 	{
 	    glMatrixMode( GL_PROJECTION );
 	    glPushMatrix();
@@ -851,7 +853,7 @@ namespace render
 	    glLoadIdentity();
 	}
 
-	void Render::LeaveScreenSpace()
+	void Interface::LeaveScreenSpace()
 	{
 	    glMatrixMode( GL_MODELVIEW );
 	    glPopMatrix();
@@ -861,7 +863,7 @@ namespace render
 	}
 	
 	/*
-	void Render::FrustumCullCubes( RenderState & renderState )
+	void Interface::FrustumCullCubes( RenderState & renderState )
 	{
 		Frustum frustum;
 		CalculateFrustumPlanes( frustum );
@@ -905,7 +907,7 @@ namespace render
 	}
 	*/
 
-	void Render::CalculateFrustumPlanes( math::Frustum & frustum )
+	void Interface::CalculateFrustumPlanes( math::Frustum & frustum )
 	{
 		math::Matrix projection;
 		glGetFloatv( GL_PROJECTION_MATRIX, projection.data() );

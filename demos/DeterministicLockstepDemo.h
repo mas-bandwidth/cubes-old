@@ -64,7 +64,7 @@ private:
 
     Mode mode;
 
-	render::Render * render;
+	render::Interface * renderInterface;
 
     uint32_t frameNumber;
 
@@ -122,14 +122,13 @@ public:
 
         frameNumber = 0;
 
-        render = NULL;
+        renderInterface = NULL;
 	}
 	
 	~DeterministicLockstepDemo()
 	{
         for ( int i = 0; i < NumInstances; ++i )
 		  delete instance[i].game;
-		delete render;
 	}
 	
 	void InitializeWorld()
@@ -161,16 +160,11 @@ public:
         }
 	}
 	
-	void InitializeRender( int displayWidth, int displayHeight )
+	void SetRenderInterface( render::Interface * renderInterface )
 	{
-		render = new render::Render( displayWidth, displayHeight );
+		this->renderInterface = renderInterface;
 	}
     
-	void ResizeDisplay( int displayWidth, int displayHeight )
-	{
-		render->ResizeDisplay( displayWidth, displayHeight );
-	}
-
 	void AddCube( game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * gameInstance, int player, const math::Vector & position )
 	{
 		hypercube::DatabaseObject object;
@@ -290,10 +284,10 @@ public:
 
         // prepare for rendering
 
-        render->ClearScreen();
+        renderInterface->ClearScreen();
 
-        int width = render->GetDisplayWidth();
-        int height = render->GetDisplayHeight();
+        int width = renderInterface->GetDisplayWidth();
+        int height = renderInterface->GetDisplayHeight();
 
         // render the local view (left)
 
@@ -301,15 +295,15 @@ public:
         {
             Cubes cubes;
             instance[0].viewObjectManager.GetRenderState( cubes );
-            setCameraAndLight( render, instance[0].camera );
-            render->BeginScene( 0, 0, width/2, height );
+            setCameraAndLight( renderInterface, instance[0].camera );
+            renderInterface->BeginScene( 0, 0, width/2, height );
             ActivationArea activationArea;
             setupActivationArea( activationArea, instance[0].origin, 5.0f, instance[0].t );
-            render->RenderActivationArea( activationArea, 1.0f );
-            render->RenderCubes( cubes );
+            renderInterface->RenderActivationArea( activationArea, 1.0f );
+            renderInterface->RenderCubes( cubes );
             #ifdef SHADOWS
             if ( shadows )
-                render->RenderCubeShadows( cubes );
+                renderInterface->RenderCubeShadows( cubes );
             #endif
         }
 
@@ -319,15 +313,15 @@ public:
         {
             Cubes cubes;
             instance[1].viewObjectManager.GetRenderState( cubes );
-            setCameraAndLight( render, instance[1].camera );
-            render->BeginScene( width/2, 0, width, height );
+            setCameraAndLight( renderInterface, instance[1].camera );
+            renderInterface->BeginScene( width/2, 0, width, height );
             ActivationArea activationArea;
             setupActivationArea( activationArea, instance[1].origin, 5.0f, instance[0].t );
-            render->RenderActivationArea( activationArea, 1.0f );
-            render->RenderCubes( cubes );
+            renderInterface->RenderActivationArea( activationArea, 1.0f );
+            renderInterface->RenderCubes( cubes );
             #ifdef SHADOWS
             if ( shadows )
-                render->RenderCubeShadows( cubes );
+                renderInterface->RenderCubeShadows( cubes );
             #endif
         }
 
@@ -335,17 +329,11 @@ public:
 
         #ifdef SHADOWS
         if ( shadows )
-            render->RenderShadowQuad();
+            renderInterface->RenderShadowQuad();
         #endif
 
         // divide splitscreen
 
-        render->DivideSplitscreen();
-
-        // letterbox last of all
-
-        #ifdef LETTERBOX
-        render->LetterBox( 80 );
-        #endif
+        renderInterface->DivideSplitscreen();
 	}
 };

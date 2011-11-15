@@ -49,7 +49,6 @@ namespace platform
 	void ShowMouseCursor();
 	void GetDisplayResolution( int & width, int & height );
 	bool OpenDisplay( const char title[], int width, int height, int refresh = 60 );
-	void ClearDisplay( int width, int height );
 	void UpdateDisplay( int interval = 1 );
 	void CloseDisplay();
 

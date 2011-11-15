@@ -14,7 +14,7 @@ private:
 	GameWorkerThread workerThread;
 	view::Packet viewPacket;
 	view::ObjectManager viewObjectManager[2];
-	render::Render * render;
+	render::Interface * renderInterface;
 	Camera camera[2];
 	math::Vector origin[2];
 	float t;
@@ -60,13 +60,12 @@ public:
 		tabDownLastFrame = false;
 		tildeDownLastFrame = false;
 		interpolationMode = INTERPOLATE_None;
-		render = NULL;
+		renderInterface = NULL;
 	}
 
 	~InterpolationExtrapolationDemo()
 	{
 		delete gameInstance;
-		delete render;
 	}
 
 	void InitializeWorld()
@@ -95,16 +94,11 @@ public:
 		gameInstance->SetFlag( game::FLAG_Pull );
 	}
 	
-	void InitializeRender( int displayWidth, int displayHeight )
-	{
-		render = new render::Render( displayWidth, displayHeight );
-	}
-	
-	void ResizeDisplay( int displayWidth, int displayHeight )
-	{
-		render->ResizeDisplay( displayWidth, displayHeight );
-	}
-
+    void SetRenderInterface( render::Interface * renderInterface )
+    {
+        this->renderInterface = renderInterface;
+    }
+    
 	void AddCube( game::Instance<cubes::DatabaseObject, cubes::ActiveObject> * gameInstance, float scale, const math::Vector & position, const math::Vector & linearVelocity = math::Vector(0,0,0), const math::Vector & angularVelocity = math::Vector(0,0,0) )
 	{
 		cubes::DatabaseObject object;
@@ -265,46 +259,46 @@ public:
 
 		// render the simulated scene (left)
 
-		render->ClearScreen();
+		renderInterface->ClearScreen();
 
-		int width = render->GetDisplayWidth();
-		int height = render->GetDisplayHeight();
+		int width = renderInterface->GetDisplayWidth();
+		int height = renderInterface->GetDisplayHeight();
 
 		Cubes cubes;
 		viewObjectManager[0].GetRenderState( cubes );
-		setCameraAndLight( render, camera[0] );
-		render->BeginScene( 0, 0, width/2, height );
+		setCameraAndLight( renderInterface, camera[0] );
+		renderInterface->BeginScene( 0, 0, width/2, height );
 		ActivationArea activationArea;
 		setupActivationArea( activationArea, origin[0], 5.0f, t );
-		render->RenderActivationArea( activationArea, 1.0f );
-		render->RenderCubes( cubes );
+		renderInterface->RenderActivationArea( activationArea, 1.0f );
+		renderInterface->RenderCubes( cubes );
 		#ifdef SHADOWS
 		if ( shadows )
-			render->RenderCubeShadows( cubes );
+			renderInterface->RenderCubeShadows( cubes );
 		#endif
 
 		// render the interpolated scene (right)
 
 		viewObjectManager[1].GetRenderState( cubes, true );
-		setCameraAndLight( render, camera[1] );
-		render->BeginScene( width/2, 0, width, height );
+		setCameraAndLight( renderInterface, camera[1] );
+		renderInterface->BeginScene( width/2, 0, width, height );
 		setupActivationArea( activationArea, origin[1], 5.0f, t );
-		render->RenderActivationArea( activationArea, 1.0f );
-		render->RenderCubes( cubes );
+		renderInterface->RenderActivationArea( activationArea, 1.0f );
+		renderInterface->RenderCubes( cubes );
 		#ifdef SHADOWS
 		if ( shadows )
-			render->RenderCubeShadows( cubes );
+			renderInterface->RenderCubeShadows( cubes );
 		#endif
 
 		// shadow quad on top
 
 		#ifdef SHADOWS
 		if ( shadows )
-			render->RenderShadowQuad();
+			renderInterface->RenderShadowQuad();
 		#endif
 
-        #ifdef LETTERBOX
-        render->LetterBox( 80 );
-        #endif
+        // divide splitscreen
+
+        renderInterface->DivideSplitscreen();
 	}
 };

@@ -509,12 +509,12 @@ namespace view
 		activationArea.a *= 0.4f;
 	}
 
-	void setCameraAndLight( render::Render * render, const Camera & camera )
+	void setCameraAndLight( render::Interface * renderInterface, const Camera & camera )
 	{
-		render->SetCamera( camera.position, camera.lookat, camera.up );
+ 		renderInterface->SetCamera( camera.position, camera.lookat, camera.up );
 		math::Vector lightPosition = math::Vector( 25.0f, -25.0f, 50.0f );
 		lightPosition += camera.lookat;
-		render->SetLightPosition( lightPosition );
+		renderInterface->SetLightPosition( lightPosition );
 	}
 }
 

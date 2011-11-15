@@ -35,9 +35,9 @@ DONE:
 - point sampling demo
 - linear interpolation demo
 - extrapolation demo
+- need to get the authority red color solid in interpolation demo
 
 TODO:
-- need to get the authority red color solid in interpolation demo
 - render should be a global object passed TO the demo, not owned by
 - letterboxing should be applied post render by demo.cpp
 - clear display should respect letterboxing on switching demos
