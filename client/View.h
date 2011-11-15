@@ -69,6 +69,7 @@ namespace view
 
 	enum InterpolationMode
 	{
+        INTERPOLATE_None,
 		INTERPOLATE_Linear,
 		INTERPOLATE_Hermite,
 		INTERPOLATE_Extrapolate,

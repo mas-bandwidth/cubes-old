@@ -6,22 +6,78 @@
 
 #include "demos/Demo.h"
 #include "shared/Hypercube.h"
+#include <queue>
+
+const int MaxFrames = 256;
+
+struct Frame
+{
+    int number;
+    float deltaTime;
+    game::Input input;  
+};
+
+class DeterministicLockstepWorkerThread : public WorkerThread
+{
+public:
+    
+    DeterministicLockstepWorkerThread()
+    {
+        instance = NULL;
+        numFrames = 0;
+    } 
+    
+    void Start( game::Interface * instance, int numFrames, Frame * frames )
+    {
+        assert( frames <= MaxFrames );
+        assert( instance );
+        this->instance = instance;
+        this->numFrames = numFrames;
+        for ( int i = 0; i < numFrames; ++i )
+            this->frames[i] = frames[i];
+        WorkerThread::Start();
+    }
+
+private:
+    
+    virtual void Run()
+    {
+        for ( int i = 0; i < numFrames; ++i )
+        {
+            instance->SetPlayerInput( 0, frames[i].input );
+            instance->Update( frames[i].deltaTime );
+        }
+    }
+    
+    game::Interface * instance;
+    int numFrames;
+    Frame frames[MaxFrames];
+};
 
 class DeterministicLockstepDemo : public Demo
 {
+public:
+
+    enum Mode { Unsynced, Deterministic, NonDeterministic };
+
 private:
 
+    Mode mode;
+
 	render::Render * render;
+
+    uint32_t frameNumber;
 
     struct Instance
     {
         game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> * game;
-
-        float t;            // NETHACK: using floating point time is a very bad idea
+        float t;
+        int lag;
+        bool updated;
         Camera camera;
         math::Vector origin;
-        GameWorkerThread workerThread;
-
+        std::queue<Frame> frames;
+        DeterministicLockstepWorkerThread workerThread;
         view::Packet viewPacket;
         view::ObjectManager viewObjectManager;
     };
@@ -34,8 +90,10 @@ public:
 
 	enum { steps = 1024 };
 
-	DeterministicLockstepDemo()
+	DeterministicLockstepDemo( Mode mode = Deterministic )
 	{
+        this->mode = mode;
+
 		game::Config config;
 		config.maxObjects = steps * steps + MaxPlayers + 1;
 		config.deactivationTime = 0.5f;
@@ -56,9 +114,13 @@ public:
         for ( int i = 0; i < NumInstances; ++i )
         {
     		instance[i].game = new game::Instance<hypercube::DatabaseObject, hypercube::ActiveObject> ( config );
-    		instance[i].t = 0.0f;
     		instance[i].origin = math::Vector(0,0,0);
+            instance[i].lag = ( i == 0 || mode == NonDeterministic ) ? 0 : 90;
+            instance[i].t = 0.0f;
+            instance[i].updated = false;
         }
+
+        frameNumber = 0;
 
         render = NULL;
 	}
@@ -125,7 +187,22 @@ public:
 
 	void ProcessInput( const platform::Input & input )
 	{
-		// pass input to game instance
+        // process debug inputs
+
+        if ( input.one )
+            instance[1].lag = 0;
+        else if ( input.two )
+            instance[1].lag = 10;
+        else if ( input.three )
+            instance[1].lag = 20;
+        else if ( input.four )
+            instance[1].lag = 40;
+        else if ( input.five )
+            instance[1].lag = 60;
+        else if ( input.six )
+            instance[1].lag = 90;
+
+		// determine last game input
 		
 		game::Input gameInput;
 		gameInput.left = input.left ? 1.0f : 0.0f;
@@ -135,30 +212,38 @@ public:
 		gameInput.push = input.space ? 1.0f : 0.0f;
 		gameInput.pull = input.z ? 1.0f : 0.0f;
 
-        // NETHACK: todo - actually we want to stagger the input for the second instance
+        // queue up frames for each instance to process
+
         for ( int i = 0; i < NumInstances; ++i )
-            instance[i].game->SetPlayerInput( 0, gameInput );
+        {
+            Frame frame;
+            frame.number = frameNumber;
+            if ( mode == NonDeterministic && i != 0 )
+                frame.deltaTime = DeltaTime + ( (frame.number%2) ? +1 : -1 ) * 0.0001f;
+            else
+                frame.deltaTime = DeltaTime;
+            frame.input = gameInput;
+            instance[i].frames.push( frame );
+        }
+
+        frameNumber++;
 	}
 	
 	void Update( float deltaTime )
 	{
         for ( int i = 0; i < NumInstances; ++i )
         {
-    		// update camera
-    		view::Object * playerCube = instance[i].viewObjectManager.GetObject( 1 );
-    		if ( playerCube )
-    			instance[i].origin = playerCube->position + playerCube->positionError;
-    		math::Vector lookat = instance[i].origin - math::Vector(0,0,1);
-    		#ifdef WIDESCREEN
-    		math::Vector position = lookat + math::Vector(0,-11,5);
-    		#else
-    		math::Vector position = lookat + math::Vector(0,-12,6);
-    		#endif
-    		instance[i].camera.EaseIn( lookat, position ); 
-
-    		// start the worker thread
-    		instance[i].workerThread.Start( instance[i].game );
-    		instance[i].t += deltaTime;
+            int numFrames = 0;
+            Frame frames[MaxFrames];
+            const int nextFrame = frameNumber - instance[i].lag;
+            while ( instance[i].frames.size() && instance[i].frames.front().number < nextFrame && numFrames < MaxFrames )
+            {
+                frames[numFrames++] = instance[i].frames.front();
+                instance[i].frames.pop();                
+            }
+            instance[i].workerThread.Start( instance[i].game, numFrames, frames );
+            if ( numFrames > 0 )
+                instance[i].updated = true;
         }
 	}
 
@@ -167,6 +252,7 @@ public:
         for ( int i = 0; i < NumInstances; ++i )
         {
             instance[i].workerThread.Join();
+     
             instance[i].game->GetViewPacket( instance[i].viewPacket );
         }
     }
@@ -177,6 +263,19 @@ public:
 		
         for ( int i = 0; i < NumInstances; ++i )
         {
+            view::Object * playerCube = instance[i].viewObjectManager.GetObject( 1 );
+            if ( playerCube )
+                instance[i].origin = playerCube->position + playerCube->positionError;
+
+            math::Vector lookat = instance[i].origin - math::Vector(0,0,1);
+            #ifdef WIDESCREEN
+            math::Vector position = lookat + math::Vector(0,-11,5);
+            #else
+            math::Vector position = lookat + math::Vector(0,-12,6);
+            #endif
+
+            instance[i].camera.EaseIn( lookat, position ); 
+
     		if ( instance[i].viewPacket.objectCount >= 1 )
     		{
     			view::ObjectUpdate updates[MaxViewObjects];
@@ -198,31 +297,39 @@ public:
 
         // render the local view (left)
 
-        Cubes cubes;
-        instance[0].viewObjectManager.GetRenderState( cubes );
-        setCameraAndLight( render, instance[0].camera );
-        render->BeginScene( 0, 0, width/2, height );
-        ActivationArea activationArea;
-        setupActivationArea( activationArea, instance[0].origin, 5.0f, instance[0].t );
-        render->RenderActivationArea( activationArea, 1.0f );
-        render->RenderCubes( cubes );
-        #ifdef SHADOWS
-        if ( shadows )
-            render->RenderCubeShadows( cubes );
-        #endif
+        if ( instance[0].updated )
+        {
+            Cubes cubes;
+            instance[0].viewObjectManager.GetRenderState( cubes );
+            setCameraAndLight( render, instance[0].camera );
+            render->BeginScene( 0, 0, width/2, height );
+            ActivationArea activationArea;
+            setupActivationArea( activationArea, instance[0].origin, 5.0f, instance[0].t );
+            render->RenderActivationArea( activationArea, 1.0f );
+            render->RenderCubes( cubes );
+            #ifdef SHADOWS
+            if ( shadows )
+                render->RenderCubeShadows( cubes );
+            #endif
+        }
 
         // render the remote view (right)
 
-        instance[1].viewObjectManager.GetRenderState( cubes );
-        setCameraAndLight( render, instance[1].camera );
-        render->BeginScene( width/2, 0, width, height );
-        setupActivationArea( activationArea, instance[1].origin, 5.0f, instance[0].t );
-        render->RenderActivationArea( activationArea, 1.0f );
-        render->RenderCubes( cubes );
-        #ifdef SHADOWS
-        if ( shadows )
-            render->RenderCubeShadows( cubes );
-        #endif
+        if ( instance[1].updated )
+        {
+            Cubes cubes;
+            instance[1].viewObjectManager.GetRenderState( cubes );
+            setCameraAndLight( render, instance[1].camera );
+            render->BeginScene( width/2, 0, width, height );
+            ActivationArea activationArea;
+            setupActivationArea( activationArea, instance[1].origin, 5.0f, instance[0].t );
+            render->RenderActivationArea( activationArea, 1.0f );
+            render->RenderCubes( cubes );
+            #ifdef SHADOWS
+            if ( shadows )
+                render->RenderCubeShadows( cubes );
+            #endif
+        }
 
         // shadow quad on top
 

@@ -8,6 +8,7 @@
 #include "network/netSockets.h"
 #include "demos/SingleplayerDemo.h"
 #include "demos/DeterministicLockstepDemo.h"
+#include "demos/InterpolationExtrapolationDemo.h"
 
 #if PLATFORM == PLATFORM_MAC
 #include <OpenGl/gl.h>
@@ -22,7 +23,13 @@ Demo * CreateDemo( int index )
 		return new SingleplayerDemo();
 
     if ( index == 1 )
-        return new DeterministicLockstepDemo();
+        return new DeterministicLockstepDemo( DeterministicLockstepDemo::Deterministic );
+
+    if ( index == 2 )
+        return new DeterministicLockstepDemo( DeterministicLockstepDemo::NonDeterministic );
+
+    if ( index == 3 )
+        return new InterpolationExtrapolationDemo();
 
 	return NULL;
 }

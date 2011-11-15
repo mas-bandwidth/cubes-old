@@ -31,12 +31,15 @@ public:
 	GameWorkerThread()
 	{
 		instance = NULL;
+        numSteps = 1;
 	} 
 	
-	void Start( game::Interface * instance )
+	void Start( game::Interface * instance, float deltaTime = DeltaTime, int numSteps = 1 )
 	{
 		assert( instance );
 		this->instance = instance;
+        this->deltaTime = deltaTime;
+        this->numSteps = numSteps;
 		WorkerThread::Start();
 	}
 	
@@ -55,7 +58,8 @@ private:
 		#ifdef HAS_OPENGL
 		platform::Timer timer;
 		#endif
-		instance->Update( DeltaTime );
+        for ( int i = 0; i < numSteps; ++i )
+		  instance->Update( deltaTime );
 		#ifdef HAS_OPENGL
 		simTime = timer.delta();
 		#endif
@@ -65,6 +69,8 @@ private:
 	float simTime;
 	#endif
 	game::Interface * instance;
+    int numSteps;
+    float deltaTime;
 };
 
 // ------------------------------------------------------

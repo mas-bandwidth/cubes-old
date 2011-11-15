@@ -163,6 +163,11 @@ namespace view
 
 			assert( object );
 	
+            if ( interpolationMode == INTERPOLATE_None )
+            {
+                object->interpolatedPosition = object->position;
+                object->interpolatedOrientation = object->orientation;
+            }
 			if ( interpolationMode == INTERPOLATE_Linear )
 			{
 				object->interpolatedPosition = object->previousPosition + ( object->position - object->previousPosition ) * t;
@@ -259,23 +264,44 @@ namespace view
 			return NULL;
 	}
 
-	void ObjectManager::GetRenderState( render::Cubes & renderState, bool interpolation, bool smoothing )
-	{
-		renderState.numCubes = objects.size();
+    void ObjectManager::GetRenderState( render::Cubes & renderState, bool interpolation, bool smoothing )
+    {
+        renderState.numCubes = objects.size();
 
-		assert( renderState.numCubes <= MaxViewObjects );
+        assert( renderState.numCubes <= MaxViewObjects );
 
-		unsigned int i = 0;
-		for ( object_map::iterator itor = objects.begin(); itor != objects.end(); ++itor )
-		{
-			Object * object = itor->second;
-			assert( object );
+        unsigned int i = 0;
+        for ( object_map::iterator itor = objects.begin(); itor != objects.end(); ++itor )
+        {
+            Object * object = itor->second;
+            assert( object );
             
+            math::Vector position;
+            math::Quaternion orientation;
+            if ( !interpolation )
+            {
+                if ( smoothing )
+                {
+                    position = object->position + object->positionError;                
+                    orientation = object->visualOrientation;
+                }
+                else
+                {
+                    position = object->position;
+                    orientation = object->orientation;
+                }
+            }
+            else
+            {
+                position = object->interpolatedPosition;
+                orientation = object->interpolatedOrientation;
+            }
+
             float translation_data[16];
             float rotation_data[16];
             float scale_data[16];
-			math::build_translation( translation_data, object->position + object->positionError );
-			math::build_rotation( rotation_data, object->visualOrientation );
+            math::build_translation( translation_data, position );
+            math::build_rotation( rotation_data, orientation );
             math::build_scale( scale_data, object->scale * 0.5f );
             
             vectorial::mat4f translation;
@@ -293,7 +319,7 @@ namespace view
             rotation.load( rotation_data );
             scale.load( scale_data );
             
-			math::build_translation( inv_translation_data, - ( object->position + object->positionError ) );
+            math::build_translation( inv_translation_data, - ( object->position + object->positionError ) );
             math::build_scale( inv_scale_data, 1.0f / ( object->scale * 0.5f ) );
 
             vectorial::mat4f inv_translation;
@@ -306,17 +332,17 @@ namespace view
             renderState.cube[i].transform = translation * rotation * scale;
             renderState.cube[i].inverse_transform = inv_rotation * inv_translation;
             
-			renderState.cube[i].r = object->r;
-			renderState.cube[i].g = object->g;
-			renderState.cube[i].b = object->b;
-			renderState.cube[i].a = object->a;
+            renderState.cube[i].r = object->r;
+            renderState.cube[i].g = object->g;
+            renderState.cube[i].b = object->b;
+            renderState.cube[i].a = object->a;
 
-			i++;
-		}
-		
-		// sort back to front
-		std::sort( renderState.cube, renderState.cube + renderState.numCubes );
-	}
+            i++;
+        }
+        
+        // sort back to front
+        std::sort( renderState.cube, renderState.cube + renderState.numCubes );
+    }
 
 	// ------------------------------------------------------
 

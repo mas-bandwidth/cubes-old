@@ -23,25 +23,42 @@ DONE:
 - change demo to output exactly at 1280x720 letterboxed (black above/below)
 - write TGA files at 1280x720 resolution skipping past first 40 lines
 - verify exact fit in keynote post handbrake
+- ndl headers should be generated separately for the dep to precompiled
+- this will fix the problem with network library getting built on clean =p
+- there are problems with dependency checking that are annoying
+- adjust the lockstep demo so that input to the second simulation goes in to a queue
+- variable number of frames to hold in the queue before releasing
+- 1,2,3,4,5,6 changes number of frames the second simulation is behind
+- need to be able to dynamically adjust ahead/behind as well!
+- get the non-deterministic mode working again
+- get interpolation/extrapolation demo back
+- point sampling demo
+- linear interpolation demo
+- extrapolation demo
 
 TODO:
+- need to get the authority red color solid in interpolation demo
+- render should be a global object passed TO the demo, not owned by
+- letterboxing should be applied post render by demo.cpp
+- clear display should respect letterboxing on switching demos
+- perhaps instead of splitscreen, we could show the cubes overlaid (ghosted) to show the blah
 
 DEMO VISUALS:
 1. singleplayer demo (done)
-2. deterministic lockstep: not synced at all
-3. deterministic lockstep: synced via input but drifts into error (different delta times...)
-4. deterministic lockstep: in sync and verified by comparing hash of physics state!
-5. interpolation: point sampling
-6. interpolation: linear interpolation
-7. interpolation: linear extrapolation, ballistic extrapolation
+2. deterministic lockstep: synced via input but drifts into error (done)
+3. deterministic lockstep: in sync and delayed by 1.5 secs (done)
+4. interpolation: point sampling (done)
+5. interpolation: linear interpolation (done)
+6. interpolation: linear extrapolation, ballistic extrapolation (done)
+7. push/pull: highlight prioritized sends with flash (done)
 
 PLANNING:
 
 1. show demo, explain how it works. one million cubes. activation etc. blow. katarami.
-2. splitscreen --- not in sync...
-3. send input across. describe input. sent across in packets. if no packet recieved that frame, hold previous input.
-4. goes out of sync... --> same framerate, determinism/lockstep discussion
-5. interpolation/extrapolation --> describe packet, object ids. interpolation. linear error, additional latency, etc.
+2. send input across. describe input. sent across in packets. every packet arrives. lockstep discussion.
+3. goes out of sync... --> slightly different delta times --> floating point determinism discussion.
+4. interpolation --> describe packet, object ids. interpolation. linear error, additional latency, etc.
+5. extrapolation --> poor prediction. eventually, would rewrite an approximation of the sim in the remote view.
 6. run simulation on both sides ---> prioritization. push/pull/serialize. *smoothing*, error reduction.
 7. serialize function, bit packer etc.
 8. low hanging fruit. object id, reduce to n bits. be smart about local player cube (always first cube), saves 2 bytes per-packet.
@@ -60,10 +77,16 @@ PLANNING:
     position?
 
 HOUSEKEEPING:
+- need to fix the at rest problem! make it so that objects have some minimum force before they will
+  come back from rest. this probably means i need to get the amount of force applied to an at rest
+  object from the solver somehow? how to do this?
 - get tests working again (ideally, link network tests in with engine tests and run in one go...)
 - find a way to get truetype font rendering to textures working
 - identify cool libraries used by "Carbon Studios" and see if any of them
   can be used in my project, eg. hashing functions (MD5) would be cool for det check.
+- add hash query functions to game, simulation, activation system etc. hash the entire state and verify
+  that the game is deterministic on playback. recording inputs and save the hashes. compare hashes on frames
+  during playback to verify deterministic.
 
 visual things to show:
 - splitscreen demo: synchronize left -> right with latency
@@ -104,6 +127,12 @@ side points:
   a car, extrap using physics sim is best bet. linear extrap or ballistic is poor.
 
 ideas:
+- if cubes are pushed below the cube then they can be destroyed/removed/eaten, especially if you land on them *splat*
+- idea: resolve problematic cases where the small cubes look bad by removing them
+- holding Z+SPACE = slide mode (pull towards ground, slide out like a hockey puck, but with some friction...)
+- space while in a large katamari ball = explosion
+- implement super-slowmo pause and unpause. this would be particularly good for showing diagrams over the video
+  (vs. just hard pausing in and showing diagrams...)
 - get better visual quality by writing a pixel shader (per-pixel lighting will look less flat)
 - fix the at rest jitter by requiring a certain force threshold to wake an object from rest (if white)
 - integrate FMOD and get some sounds going, increase the pitch of the sounds the longer the cube grows

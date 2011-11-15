@@ -122,18 +122,6 @@ public:
 	
 	void Update( float deltaTime )
 	{
-		// update camera
-		view::Object * playerCube = viewObjectManager.GetObject( 1 );
-		if ( playerCube )
-			origin = playerCube->position + playerCube->positionError;
-		math::Vector lookat = origin - math::Vector(0,0,1);
-		#ifdef WIDESCREEN
-		math::Vector position = lookat + math::Vector(0,-11,5);
-		#else
-		math::Vector position = lookat + math::Vector(0,-12,6);
-		#endif
-		camera.EaseIn( lookat, position ); 
-
 		// start the worker thread
 		workerThread.Start( gameInstance );
 		t += deltaTime;
@@ -155,8 +143,22 @@ public:
 			getViewObjectUpdates( updates, viewPacket );
 			viewObjectManager.UpdateObjects( updates, viewPacket.objectCount );
 		}
+
 		viewObjectManager.ExtrapolateObjects( deltaTime );
 		viewObjectManager.Update( deltaTime );
+
+        // update camera
+
+        view::Object * playerCube = viewObjectManager.GetObject( 1 );
+        if ( playerCube )
+            origin = playerCube->position + playerCube->positionError;
+        math::Vector lookat = origin - math::Vector(0,0,1);
+        #ifdef WIDESCREEN
+        math::Vector position = lookat + math::Vector(0,-11,5);
+        #else
+        math::Vector position = lookat + math::Vector(0,-12,6);
+        #endif
+        camera.EaseIn( lookat, position ); 
 
 		// render the scene
 		
